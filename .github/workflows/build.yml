@@ -1,56 +1,94 @@
-name: 🚀 Build TikVply Android
+name: Build TikVply Android
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tikvply-android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Build TikVply APKs
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
+
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-    
-    - name: ☕ Setup Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: 💙 Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.22.0'
-        channel: 'stable'
-        cache: true
-    
-    - name: 🎨 Generate app icons
-      run: |
-        flutter pub get
-        flutter pub run flutter_launcher_icons:main
-    
-    - name: 🔨 Build APK
-      run: flutter build apk --release --split-per-abi --no-shrink
-    
-    - name: 📤 Upload arm64-v8a
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-arm64-v8a
-        path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-        retention-days: 30
-    
-    - name: 📤 Upload armeabi-v7a
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-armeabi-v7a
-        path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-        retention-days: 30
-    
-    - name: 📤 Upload x86_64
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-x86_64
-        path: build/app/outputs/flutter-apk/app-x86_64-release.apk
-        retention-days: 30
+      - name: Checkout TikVply
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Generate fresh Android project
+        run: |
+          rm -rf android
+          flutter create \
+            --platforms=android \
+            --project-name=tikvply \
+            --org=com.tikvply \
+            --android-language=kotlin \
+            .
+
+          # Current Flutter plugins require Android SDK 36.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          s = p.read_text()
+          if "compileSdk = flutter.compileSdkVersion" in s:
+              s = s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
+          elif "compileSdk = 34" in s:
+              s = s.replace("compileSdk = 34", "compileSdk = 36")
+          else:
+              raise SystemExit("Could not locate compileSdk in generated android/app/build.gradle.kts")
+          p.write_text(s)
+          PY
+
+          grep -n "compileSdk" android/app/build.gradle.kts
+
+      - name: Install TikVply dependencies
+        run: flutter pub get
+
+      - name: Verify repository assets
+        shell: bash
+        run: |
+          test -d assets/images
+          test -d assets/animations
+
+      - name: Build TikVply release APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Verify APK outputs
+        shell: bash
+        run: |
+          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          test -f build/app/outputs/flutter-apk/app-x86_64-release.apk
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload TikVply Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tikvply-android-apks
+          path: build/app/outputs/flutter-apk/app-*-release.apk
+          if-no-files-found: error
+          retention-days: 30
