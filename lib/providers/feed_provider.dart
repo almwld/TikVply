@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/video/video_model.dart';
-import '../models/video/video_sound.dart';
 import '../models/user/user_model.dart';
 import '../services/local_video_service.dart';
 
@@ -37,11 +36,6 @@ class VideoProvider extends ChangeNotifier {
           user: user,
           videoUrl: path,
           caption: path.split(RegExp(r'[/\\]')).last,
-          likesCount: 0,
-          commentsCount: 0,
-          sharesCount: 0,
-          viewsCount: 0,
-          savesCount: 0,
           duration: '—',
           quality: 'Local',
           aspectRatio: 9 / 16,
@@ -71,9 +65,7 @@ class VideoProvider extends ChangeNotifier {
       if (result == null) return;
       for (final file in result.files) {
         final path = file.path;
-        if (path != null && path.isNotEmpty) {
-          await _localVideoService.addPath(path);
-        }
+        if (path != null && path.isNotEmpty) await _localVideoService.addPath(path);
       }
       await loadLocalVideos();
     } catch (e) {
@@ -85,12 +77,9 @@ class VideoProvider extends ChangeNotifier {
   Future<void> removeVideo(String videoId) async {
     final index = _videos.indexWhere((video) => video.id == videoId);
     if (index == -1) return;
-    final path = _videos[index].videoUrl;
-    await _localVideoService.removePath(path);
+    await _localVideoService.removePath(_videos[index].videoUrl);
     _videos.removeAt(index);
-    if (_currentIndex >= _videos.length && _videos.isNotEmpty) {
-      _currentIndex = _videos.length - 1;
-    }
+    if (_currentIndex >= _videos.length && _videos.isNotEmpty) _currentIndex = _videos.length - 1;
     if (_videos.isEmpty) _currentIndex = 0;
     notifyListeners();
   }
@@ -135,15 +124,13 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  UserModel _localUser() {
-    return UserModel(
-      id: 'local_user',
-      username: 'local_library',
-      email: 'local@vidhorus.app',
-      fullName: 'فيديوهاتي',
-      avatarUrl: null,
-      isVerified: false,
-      createdAt: DateTime.now(),
-    );
-  }
+  UserModel _localUser() => UserModel(
+        id: 'local_user',
+        username: 'local_library',
+        email: 'local@vidhorus.app',
+        fullName: 'فيديوهاتي',
+        avatarUrl: null,
+        isVerified: false,
+        createdAt: DateTime.now(),
+      );
 }
