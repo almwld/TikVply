@@ -1,8 +1,8 @@
-name: Build Android
+name: Build TikVply Android
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -11,25 +11,26 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: tikvply-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build split APKs
+    name: Build TikVply APKs
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
-      - name: Checkout
+      - name: Checkout TikVply
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -43,21 +44,35 @@ jobs:
           rm -rf android
           flutter create \
             --platforms=android \
-            --project-name=vid_horus \
-            --org=com.vidhorus \
+            --project-name=tikvply \
+            --org=com.tikvply \
             --android-language=kotlin \
             .
 
-      - name: Install dependencies
+      - name: Install TikVply dependencies
         run: flutter pub get
 
-      - name: Build release APKs (split per ABI)
+      - name: Verify repository assets
+        shell: bash
+        run: |
+          test -d assets/images
+          test -d assets/animations
+
+      - name: Build TikVply release APKs
         run: flutter build apk --release --split-per-abi
 
-      - name: Upload split APKs
+      - name: Verify APK outputs
+        shell: bash
+        run: |
+          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          test -f build/app/outputs/flutter-apk/app-x86_64-release.apk
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload TikVply Android APKs
         uses: actions/upload-artifact@v4
         with:
-          name: vid-horus-split-apks
+          name: tikvply-android-apks
           path: build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
