@@ -49,13 +49,13 @@ jobs:
             flutter create --platforms=android --project-name=tikvply --org=com.tikvply .
           fi
 
-          # تحديث gradle-wrapper.properties
-          echo "📝 Updating gradle-wrapper.properties..."
+          # تحديث gradle-wrapper.properties إلى الإصدار 9.3.1
+          echo "📝 Updating gradle-wrapper.properties to 9.3.1..."
           mkdir -p android/gradle/wrapper
           cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.10.2-all.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-all.zip
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           EOF
@@ -219,16 +219,6 @@ jobs:
 
           echo "✅ Android configuration fixed successfully!"
 
-      - name: Fix file_picker compatibility
-        run: |
-          echo "🔧 Fixing file_picker compatibility..."
-          
-          # إما تحديث file_picker أو تجاوزه
-          if grep -q "file_picker" pubspec.yaml; then
-            echo "📦 Upgrading file_picker to latest version..."
-            flutter pub add file_picker:^8.1.4 || echo "⚠️ Could not upgrade file_picker"
-          fi
-
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -258,12 +248,12 @@ jobs:
       - name: Verify Android configuration
         run: |
           echo "✅ Verifying Android configuration..."
+          echo "--- gradle-wrapper.properties ---"
+          cat android/gradle/wrapper/gradle-wrapper.properties
           echo "--- compileSdkVersion ---"
           grep "compileSdkVersion" android/app/build.gradle
           echo "--- targetSdkVersion ---"
           grep "targetSdkVersion" android/app/build.gradle
-          echo "--- gradle-wrapper.properties ---"
-          cat android/gradle/wrapper/gradle-wrapper.properties
           echo "✅ Configuration verified successfully!"
 
       - name: Build APKs
