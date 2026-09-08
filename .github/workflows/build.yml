@@ -50,11 +50,7 @@ jobs:
             echo "⚠️ No icon found, creating a default one..."
             sudo apt-get update
             sudo apt-get install -y imagemagick
-            convert -size 512x512 xc:'#1a237e' \
-              -gravity center \
-              -font Helvetica -pointsize 100 -fill white \
-              -annotate 0 "TikVply" \
-              assets/images/icon.png
+            convert -size 512x512 xc:'#1a237e' -gravity center -font Helvetica -pointsize 100 -fill white -annotate 0 "TikVply" assets/images/icon.png
             echo "✅ Default icon created at assets/images/icon.png"
           fi
           
@@ -68,16 +64,15 @@ jobs:
           if ! grep -q "flutter_launcher_icons" pubspec.yaml; then
             echo "📦 Adding flutter_launcher_icons..."
             flutter pub add --dev flutter_launcher_icons
-            cat >> pubspec.yaml << 'EOF'
-
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/images/icon.png"
-  adaptive_icon_background: "#1a237e"
-  adaptive_icon_foreground: "assets/images/icon.png"
-  min_sdk_android: 21
-EOF
+            
+            echo "" >> pubspec.yaml
+            echo "flutter_launcher_icons:" >> pubspec.yaml
+            echo "  android: true" >> pubspec.yaml
+            echo "  ios: false" >> pubspec.yaml
+            echo "  image_path: \"$ICON_PATH\"" >> pubspec.yaml
+            echo "  adaptive_icon_background: \"#1a237e\"" >> pubspec.yaml
+            echo "  adaptive_icon_foreground: \"$ICON_PATH\"" >> pubspec.yaml
+            echo "  min_sdk_android: 21" >> pubspec.yaml
           fi
           
           flutter pub get
@@ -95,169 +90,139 @@ EOF
 
           echo "📝 Updating gradle-wrapper.properties to 9.3.1..."
           mkdir -p android/gradle/wrapper
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-all.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
+          echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.3.1-all.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+          echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
 
           echo "📝 Updating project build.gradle..."
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              ext.kotlin_version = '1.9.22'
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.0'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-              }
-          }
-
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-
-          rootProject.buildDir = '../build'
-          subprojects {
-              project.buildDir = "${rootProject.buildDir}/${project.name}"
-          }
-          subprojects {
-              project.evaluationDependsOn(':app')
-          }
-
-          tasks.register('clean', Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
+          echo "buildscript {" > android/build.gradle
+          echo "    ext.kotlin_version = '1.9.22'" >> android/build.gradle
+          echo "    repositories {" >> android/build.gradle
+          echo "        google()" >> android/build.gradle
+          echo "        mavenCentral()" >> android/build.gradle
+          echo "    }" >> android/build.gradle
+          echo "    dependencies {" >> android/build.gradle
+          echo "        classpath 'com.android.tools.build:gradle:8.1.0'" >> android/build.gradle
+          echo "        classpath \"org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version\"" >> android/build.gradle
+          echo "    }" >> android/build.gradle
+          echo "}" >> android/build.gradle
+          echo "allprojects {" >> android/build.gradle
+          echo "    repositories {" >> android/build.gradle
+          echo "        google()" >> android/build.gradle
+          echo "        mavenCentral()" >> android/build.gradle
+          echo "    }" >> android/build.gradle
+          echo "}" >> android/build.gradle
+          echo "rootProject.buildDir = '../build'" >> android/build.gradle
+          echo "subprojects {" >> android/build.gradle
+          echo "    project.buildDir = \"\${rootProject.buildDir}/\${project.name}\"" >> android/build.gradle
+          echo "}" >> android/build.gradle
+          echo "subprojects {" >> android/build.gradle
+          echo "    project.evaluationDependsOn(':app')" >> android/build.gradle
+          echo "}" >> android/build.gradle
+          echo "tasks.register('clean', Delete) {" >> android/build.gradle
+          echo "    delete rootProject.buildDir" >> android/build.gradle
+          echo "}" >> android/build.gradle
 
           echo "📝 Updating app build.gradle..."
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-          }
-
-          android {
-              compileSdkVersion 36
-              ndkVersion flutter.ndkVersion
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-                  coreLibraryDesugaringEnabled true
-              }
-
-              kotlinOptions {
-                  jvmTarget = '17'
-              }
-
-              defaultConfig {
-                  applicationId "com.tikvply"
-                  minSdkVersion 21
-                  targetSdkVersion 36
-                  versionCode 1
-                  versionName "1.0.0"
-                  multiDexEnabled true
-              }
-
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.debug
-                      minifyEnabled true
-                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-                  }
-              }
-          }
-
-          flutter {
-              source '../..'
-          }
-
-          dependencies {
-              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
-              implementation 'androidx.multidex:multidex:2.0.1'
-          }
-          EOF
+          echo "plugins {" > android/app/build.gradle
+          echo "    id \"com.android.application\"" >> android/app/build.gradle
+          echo "    id \"kotlin-android\"" >> android/app/build.gradle
+          echo "    id \"dev.flutter.flutter-gradle-plugin\"" >> android/app/build.gradle
+          echo "}" >> android/app/build.gradle
+          echo "android {" >> android/app/build.gradle
+          echo "    compileSdkVersion 36" >> android/app/build.gradle
+          echo "    ndkVersion flutter.ndkVersion" >> android/app/build.gradle
+          echo "    compileOptions {" >> android/app/build.gradle
+          echo "        sourceCompatibility JavaVersion.VERSION_17" >> android/app/build.gradle
+          echo "        targetCompatibility JavaVersion.VERSION_17" >> android/app/build.gradle
+          echo "        coreLibraryDesugaringEnabled true" >> android/app/build.gradle
+          echo "    }" >> android/app/build.gradle
+          echo "    kotlinOptions {" >> android/app/build.gradle
+          echo "        jvmTarget = '17'" >> android/app/build.gradle
+          echo "    }" >> android/app/build.gradle
+          echo "    defaultConfig {" >> android/app/build.gradle
+          echo "        applicationId \"com.tikvply\"" >> android/app/build.gradle
+          echo "        minSdkVersion 21" >> android/app/build.gradle
+          echo "        targetSdkVersion 36" >> android/app/build.gradle
+          echo "        versionCode 1" >> android/app/build.gradle
+          echo "        versionName \"1.0.0\"" >> android/app/build.gradle
+          echo "        multiDexEnabled true" >> android/app/build.gradle
+          echo "    }" >> android/app/build.gradle
+          echo "    buildTypes {" >> android/app/build.gradle
+          echo "        release {" >> android/app/build.gradle
+          echo "            signingConfig signingConfigs.debug" >> android/app/build.gradle
+          echo "            minifyEnabled true" >> android/app/build.gradle
+          echo "            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'" >> android/app/build.gradle
+          echo "        }" >> android/app/build.gradle
+          echo "    }" >> android/app/build.gradle
+          echo "}" >> android/app/build.gradle
+          echo "flutter {" >> android/app/build.gradle
+          echo "    source '../..'" >> android/app/build.gradle
+          echo "}" >> android/app/build.gradle
+          echo "dependencies {" >> android/app/build.gradle
+          echo "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'" >> android/app/build.gradle
+          echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
+          echo "}" >> android/app/build.gradle
 
           echo "📝 Updating AndroidManifest.xml..."
           mkdir -p android/app/src/main
-          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.tikvply">
-              
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-              <uses-permission android:name="android.permission.CAMERA"/>
-              
-              <application
-                  android:label="TikVply"
-                  android:name="${applicationName}"
-                  android:icon="@mipmap/ic_launcher"
-                  android:roundIcon="@mipmap/ic_launcher_round"
-                  android:allowBackup="true"
-                  android:theme="@style/LaunchTheme">
-                  
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:launchMode="singleTop"
-                      android:taskAffinity=""
-                      android:theme="@style/LaunchTheme"
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="true"
-                      android:windowSoftInputMode="adjustResize">
-                      
-                      <meta-data
-                          android:name="io.flutter.embedding.android.NormalTheme"
-                          android:resource="@style/NormalTheme"/>
-                          
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-                  
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2"/>
-              </application>
-          </manifest>
-          EOF
+          echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android"' > android/app/src/main/AndroidManifest.xml
+          echo '    package="com.tikvply">' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.INTERNET"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <uses-permission android:name="android.permission.CAMERA"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    <application' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:label="TikVply"' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:name="${applicationName}"' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:icon="@mipmap/ic_launcher"' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:roundIcon="@mipmap/ic_launcher_round"' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:allowBackup="true"' >> android/app/src/main/AndroidManifest.xml
+          echo '        android:theme="@style/LaunchTheme">' >> android/app/src/main/AndroidManifest.xml
+          echo '        <activity' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:name=".MainActivity"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:exported="true"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:launchMode="singleTop"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:theme="@style/LaunchTheme"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:hardwareAccelerated="true"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:windowSoftInputMode="adjustResize">' >> android/app/src/main/AndroidManifest.xml
+          echo '            <meta-data' >> android/app/src/main/AndroidManifest.xml
+          echo '                android:name="io.flutter.embedding.android.NormalTheme"' >> android/app/src/main/AndroidManifest.xml
+          echo '                android:resource="@style/NormalTheme"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '            <intent-filter>' >> android/app/src/main/AndroidManifest.xml
+          echo '                <action android:name="android.intent.action.MAIN"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '                <category android:name="android.intent.category.LAUNCHER"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '            </intent-filter>' >> android/app/src/main/AndroidManifest.xml
+          echo '        </activity>' >> android/app/src/main/AndroidManifest.xml
+          echo '        <meta-data' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:name="flutterEmbedding"' >> android/app/src/main/AndroidManifest.xml
+          echo '            android:value="2"/>' >> android/app/src/main/AndroidManifest.xml
+          echo '    </application>' >> android/app/src/main/AndroidManifest.xml
+          echo '</manifest>' >> android/app/src/main/AndroidManifest.xml
 
           echo "📝 Creating styles.xml..."
           mkdir -p android/app/src/main/res/values
-          cat > android/app/src/main/res/values/styles.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-                  <item name="android:windowBackground">@drawable/launch_background</item>
-              </style>
-              <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-                  <item name="android:windowBackground">?android:colorBackground</item>
-              </style>
-          </resources>
-          EOF
+          echo '<?xml version="1.0" encoding="utf-8"?>' > android/app/src/main/res/values/styles.xml
+          echo '<resources>' >> android/app/src/main/res/values/styles.xml
+          echo '    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">' >> android/app/src/main/res/values/styles.xml
+          echo '        <item name="android:windowBackground">@drawable/launch_background</item>' >> android/app/src/main/res/values/styles.xml
+          echo '    </style>' >> android/app/src/main/res/values/styles.xml
+          echo '    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">' >> android/app/src/main/res/values/styles.xml
+          echo '        <item name="android:windowBackground">?android:colorBackground</item>' >> android/app/src/main/res/values/styles.xml
+          echo '    </style>' >> android/app/src/main/res/values/styles.xml
+          echo '</resources>' >> android/app/src/main/res/values/styles.xml
 
           echo "📝 Creating launch_background.xml..."
           mkdir -p android/app/src/main/res/drawable
-          cat > android/app/src/main/res/drawable/launch_background.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-              <item android:drawable="@android:color/white" />
-          </layer-list>
-          EOF
+          echo '<?xml version="1.0" encoding="utf-8"?>' > android/app/src/main/res/drawable/launch_background.xml
+          echo '<layer-list xmlns:android="http://schemas.android.com/apk/res/android">' >> android/app/src/main/res/drawable/launch_background.xml
+          echo '    <item android:drawable="@android:color/white" />' >> android/app/src/main/res/drawable/launch_background.xml
+          echo '</layer-list>' >> android/app/src/main/res/drawable/launch_background.xml
 
           echo "✅ Android configuration fixed successfully!"
 
