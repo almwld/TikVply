@@ -20,7 +20,7 @@ class AppStrings {
   static const String forYou = 'For You';
   static const String forYouAr = 'لك';
   static const String following = 'Following';
-  static const String followingAr = 'following';
+  static const String followingAr = 'متابَعون';
   static const String trending = 'Trending';
   static const String trendingAr = 'رائج';
   static const String nearby = 'Nearby';
@@ -67,8 +67,6 @@ class AppStrings {
   // Profile
   static const String followers = 'Followers';
   static const String followersAr = 'متابعون';
-  static const String following = 'Following';
-  static const String followingAr = 'متابَعون';
   static const String likes = 'Likes';
   static const String likesAr = 'إعجابات';
   static const String videos = 'Videos';
@@ -143,8 +141,6 @@ class AppStrings {
   static const String cancelAr = 'إلغاء';
   static const String confirm = 'Confirm';
   static const String confirmAr = 'تأكيد';
-  static const String save = 'Save';
-  static const String saveAr = 'حفظ';
   static const String delete = 'Delete';
   static const String deleteAr = 'حذف';
   static const String done = 'Done';
