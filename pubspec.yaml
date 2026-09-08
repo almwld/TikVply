@@ -1,5 +1,5 @@
-name: vid_horus
-description: "Vid Horus - Professional Video Player App like TikTok"
+name: tikvply
+description: "TikVply - Professional Video Player App"
 version: 1.0.0+1
 
 environment:
@@ -12,7 +12,7 @@ dependencies:
   video_player: ^2.9.0
   chewie: ^1.8.0
   image_picker: ^1.0.7
-  file_picker: ^10.3.11
+  file_picker: ^8.0.7
   cached_network_image: ^3.3.1
   provider: ^6.1.1
   hive: ^2.2.3
