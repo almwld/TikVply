@@ -36,7 +36,6 @@ android {
 
     buildTypes {
         release {
-            // CI/dev builds use the debug key. Replace with a release keystore before store publication.
             signingConfig = signingConfigs.debug
             minifyEnabled false
             shrinkResources false
