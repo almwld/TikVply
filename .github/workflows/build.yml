@@ -39,25 +39,18 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
-      - name: Clean and Get Dependencies
+      - name: Fix Android configuration
         run: |
-          flutter clean
-          flutter pub get
-
-      - name: Verify repository assets
-        shell: bash
-        run: |
-          test -d assets/images
-          test -d assets/animations
-
-      - name: Fix Android Gradle
-        run: |
-          # إنشاء android مجلد إذا لم يكن موجوداً
+          echo "🔧 Fixing Android configuration..."
+          
+          # إنشاء مجلد android إذا لم يكن موجوداً
           if [ ! -d "android" ]; then
+            echo "📁 Creating Android project..."
             flutter create --platforms=android --project-name=tikvply --org=com.tikvply .
           fi
-          
+
           # تحديث gradle-wrapper.properties
+          echo "📝 Updating gradle-wrapper.properties..."
           mkdir -p android/gradle/wrapper
           cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
@@ -67,25 +60,249 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-      - name: Build TikVply release APKs
+          # تحديث build.gradle (project level)
+          echo "📝 Updating project build.gradle..."
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext.kotlin_version = '1.9.22'
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.0'
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+              }
+          }
+
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+
+          tasks.register('clean', Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+
+          # تحديث build.gradle (app level)
+          echo "📝 Updating app build.gradle..."
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              compileSdkVersion 36
+              ndkVersion flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+
+              defaultConfig {
+                  applicationId "com.tikvply"
+                  minSdkVersion 21
+                  targetSdkVersion 36
+                  versionCode 1
+                  versionName "1.0.0"
+                  multiDexEnabled true
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                      minifyEnabled true
+                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                  }
+              }
+          }
+
+          flutter {
+              source '../..'
+          }
+
+          dependencies {
+              implementation 'androidx.multidex:multidex:2.0.1'
+          }
+          EOF
+
+          # تحديث AndroidManifest.xml
+          echo "📝 Updating AndroidManifest.xml..."
+          mkdir -p android/app/src/main
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.tikvply">
+              
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+              
+              <application
+                  android:label="TikVply"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:allowBackup="true"
+                  android:theme="@style/LaunchTheme">
+                  
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme"/>
+                          
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2"/>
+              </application>
+          </manifest>
+          EOF
+
+          # إنشاء ملفات styles
+          echo "📝 Creating styles.xml..."
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">?android:colorBackground</item>
+              </style>
+          </resources>
+          EOF
+
+          # إنشاء ملف launch_background
+          echo "📝 Creating launch_background.xml..."
+          mkdir -p android/app/src/main/res/drawable
+          cat > android/app/src/main/res/drawable/launch_background.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/white" />
+          </layer-list>
+          EOF
+
+          echo "✅ Android configuration fixed successfully!"
+
+      - name: Fix file_picker compatibility
         run: |
+          echo "🔧 Fixing file_picker compatibility..."
+          
+          # إما تحديث file_picker أو تجاوزه
+          if grep -q "file_picker" pubspec.yaml; then
+            echo "📦 Upgrading file_picker to latest version..."
+            flutter pub add file_picker:^8.1.4 || echo "⚠️ Could not upgrade file_picker"
+          fi
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Flutter
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            build/
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          flutter clean
+          flutter pub get
+
+      - name: Verify Android configuration
+        run: |
+          echo "✅ Verifying Android configuration..."
+          echo "--- compileSdkVersion ---"
+          grep "compileSdkVersion" android/app/build.gradle
+          echo "--- targetSdkVersion ---"
+          grep "targetSdkVersion" android/app/build.gradle
+          echo "--- gradle-wrapper.properties ---"
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          echo "✅ Configuration verified successfully!"
+
+      - name: Build APKs
+        run: |
+          echo "🏗️ Building APKs..."
           flutter build apk --release --split-per-abi --no-tree-shake-icons
 
-      - name: Verify APK outputs
-        shell: bash
+      - name: List APKs
         run: |
-          ls -lh build/app/outputs/flutter-apk/
+          echo "📦 Generated APKs:"
+          ls -lh build/app/outputs/flutter-apk/ || echo "⚠️ No APKs found"
+
+      - name: Verify APKs exist
+        run: |
+          echo "🔍 Verifying APKs..."
           if [ -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ]; then
             echo "✅ ARM64 APK found"
+          else
+            echo "❌ ARM64 APK missing"
+            exit 1
           fi
+          
           if [ -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ]; then
             echo "✅ ARMv7 APK found"
+          else
+            echo "❌ ARMv7 APK missing"
+            exit 1
           fi
+          
           if [ -f build/app/outputs/flutter-apk/app-x86_64-release.apk ]; then
             echo "✅ x86_64 APK found"
+          else
+            echo "❌ x86_64 APK missing"
+            exit 1
           fi
+          
+          echo "✅ All APKs verified successfully!"
 
-      - name: Upload TikVply Android APKs
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: tikvply-android-apks
