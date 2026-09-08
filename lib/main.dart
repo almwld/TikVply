@@ -11,32 +11,22 @@ import 'providers/auth_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/upload_provider.dart';
+import 'providers/video_settings_provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/feed/feed_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Supabase (uncomment when you have credentials)
-  // await Supabase.initialize(
-  //   url: 'https://your-project.supabase.co',
-  //   anonKey: 'your-anon-key',
-  // );
-
-  // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
-
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.black,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
   runApp(const VidHorusApp());
 }
 
@@ -50,11 +40,12 @@ class VidHorusApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => VideoProvider()),
+        ChangeNotifierProvider(create: (_) => VideoSettingsProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => UploadProvider()),
       ],
       child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
+        builder: (context, themeProvider, _) {
           return MaterialApp(
             title: 'Vid Horus',
             debugShowCheckedModeBanner: false,
@@ -62,11 +53,9 @@ class VidHorusApp extends StatelessWidget {
             darkTheme: DarkTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             initialRoute: AppRoutes.splash,
-            onGenerateRoute: (settings) {
-              return MaterialPageRoute(
-                builder: (context) => _getPage(settings.name),
-              );
-            },
+            onGenerateRoute: (settings) => MaterialPageRoute(
+              builder: (_) => _getPage(settings.name),
+            ),
             home: const SplashScreen(),
           );
         },
@@ -79,7 +68,6 @@ class VidHorusApp extends StatelessWidget {
       case AppRoutes.splash:
         return const SplashScreen();
       case AppRoutes.main:
-        return const MainScreen();
       default:
         return const MainScreen();
     }
