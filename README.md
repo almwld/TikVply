@@ -39,7 +39,7 @@ flutter run
 
 ## CI / Build
 
-Every push and pull request runs the GitHub Actions workflow at `.github/workflows/build.yml`. It installs the stable Flutter SDK, fetches dependencies, runs static analysis and tests, then builds a release Android APK. The generated APK is uploaded as a workflow artifact.
+Every push and pull request runs `.github/workflows/build.yml`. The workflow installs the stable Flutter SDK, fetches dependencies, runs static analysis and tests, builds a release Android APK, and uploads the APK as an artifact.
 
 For a local release build:
 
