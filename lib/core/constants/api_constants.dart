@@ -1,8 +1,6 @@
 class ApiConstants {
   // Base URLs
   static const String baseUrl = 'https://api.vidhorus.com';
-  static const String supabaseUrl = 'https://your-project.supabase.co';
-  static const String supabaseAnonKey = 'your-anon-key';
 
   // API Endpoints
   static const String auth = '/auth';
