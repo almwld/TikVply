@@ -8,35 +8,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # Icons
   cupertino_icons: ^1.0.6
-
-  # Video Player
   video_player: ^2.9.0
   chewie: ^1.8.0
-
-  # Image & Media
   image_picker: ^1.0.7
   file_picker: ^6.1.1
   cached_network_image: ^3.3.1
-
-  # State Management
   provider: ^6.1.1
-
-  # Backend - Supabase
   supabase_flutter: ^2.0.0
-
-  # Storage
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   shared_preferences: ^2.2.2
-
-  # UI Components
   flutter_svg: ^2.0.17
   shimmer: ^3.0.0
-
-  # Utilities
   intl: ^0.18.1
   url_launcher: ^6.2.2
   share_plus: ^9.0.0
@@ -44,8 +28,6 @@ dependencies:
   permission_handler: ^11.3.0
   connectivity_plus: ^6.0.0
   uuid: ^4.3.3
-
-  # Google Fonts
   google_fonts: ^6.1.0
 
 dev_dependencies:
@@ -57,7 +39,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/icons/svg/
     - assets/images/
