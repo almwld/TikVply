@@ -39,6 +39,76 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
+      # ============================================
+      # 🎨 توليد الأيقونات
+      # ============================================
+      
+      - name: Generate app icons
+        run: |
+          echo "🎨 Generating app icons..."
+          
+          # التأكد من وجود مجلد assets
+          mkdir -p assets/images
+          mkdir -p assets/icons
+          
+          # إنشاء أيقونة افتراضية إذا لم تكن موجودة
+          if [ ! -f "assets/images/icon.png" ] && [ ! -f "assets/icons/app_icon.png" ]; then
+            echo "⚠️ No icon found, creating a default one..."
+            
+            # استخدام ImageMagick لإنشاء أيقونة
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+            
+            # إنشاء أيقونة 512x512 باللون الأزرق مع نص
+            convert -size 512x512 xc:'#1a237e' \
+              -gravity center \
+              -font Helvetica -pointsize 100 -fill white \
+              -annotate 0 "TikVply" \
+              assets/images/icon.png
+            
+            echo "✅ Default icon created at assets/images/icon.png"
+          fi
+          
+          # تحديد مسار الأيقونة
+          ICON_PATH="assets/images/icon.png"
+          if [ -f "assets/icons/app_icon.png" ]; then
+            ICON_PATH="assets/icons/app_icon.png"
+          fi
+          
+          echo "📸 Using icon: $ICON_PATH"
+          
+          # إضافة flutter_launcher_icons
+          if ! grep -q "flutter_launcher_icons" pubspec.yaml; then
+            echo "📦 Adding flutter_launcher_icons..."
+            flutter pub add --dev flutter_launcher_icons
+            
+            # إضافة إعدادات الأيقونات
+            cat >> pubspec.yaml << EOF
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "$ICON_PATH"
+  adaptive_icon_background: "#1a237e"
+  adaptive_icon_foreground: "$ICON_PATH"
+  min_sdk_android: 21
+EOF
+          else
+            # تحديث مسار الأيقونة إذا كان موجوداً
+            sed -i "s|image_path:.*|image_path: \"$ICON_PATH\"|g" pubspec.yaml
+            sed -i "s|adaptive_icon_foreground:.*|adaptive_icon_foreground: \"$ICON_PATH\"|g" pubspec.yaml
+          fi
+          
+          # توليد الأيقونات
+          flutter pub get
+          flutter pub run flutter_launcher_icons:main || echo "⚠️ Icon generation had issues but continuing..."
+          
+          echo "✅ Icons generated successfully!"
+
+      # ============================================
+      # 🔧 إصلاح Android configuration
+      # ============================================
+
       - name: Fix Android configuration
         run: |
           echo "🔧 Fixing Android configuration..."
@@ -96,7 +166,7 @@ jobs:
           }
           EOF
 
-          # تحديث build.gradle (app level)
+          # تحديث build.gradle (app level) مع تفعيل desugaring
           echo "📝 Updating app build.gradle..."
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -112,6 +182,7 @@ jobs:
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
+                  coreLibraryDesugaringEnabled true
               }
 
               kotlinOptions {
@@ -141,6 +212,7 @@ jobs:
           }
 
           dependencies {
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
               implementation 'androidx.multidex:multidex:2.0.1'
           }
           EOF
@@ -156,6 +228,8 @@ jobs:
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
               
               <application
                   android:label="TikVply"
