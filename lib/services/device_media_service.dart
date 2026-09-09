@@ -3,9 +3,15 @@ import 'dart:io';
 import 'package:photo_manager/photo_manager.dart';
 
 class DeviceMediaService {
+  bool _permissionDenied = false;
+
+  bool get permissionDenied => _permissionDenied;
+
   Future<List<String>> scanAllVideos() async {
+    _permissionDenied = false;
     final permission = await PhotoManager.requestPermissionExtend();
     if (!permission.isAuth && !permission.hasAccess) {
+      _permissionDenied = true;
       return const <String>[];
     }
 
@@ -40,8 +46,6 @@ class DeviceMediaService {
   }
 
   Future<void> warmVideoFile(String path) async {
-    // Touching the file keeps this operation asynchronous and prepares the
-    // path for the player without copying or importing the original media.
     try {
       await File(path).stat();
     } catch (_) {}
