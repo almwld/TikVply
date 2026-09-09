@@ -61,10 +61,32 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text().replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"')
+          s = p.read_text()
+          s = s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />''')
+          s = s.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"')
+          s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"')
+          marker = '        </activity>'
+          intent_block = '''            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+'''
+          if marker not in s: raise SystemExit('Could not locate MainActivity closing tag')
+          s = s.replace(marker, intent_block + marker, 1)
           p.write_text(s)
           PY
-          grep -n 'compileSdk\|android:icon' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
+          grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
       - name: Install TikVply dependencies
         run: flutter pub get
       - name: Verify repository assets
