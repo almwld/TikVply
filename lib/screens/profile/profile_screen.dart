@@ -1,270 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
 import '../../models/user/user_model.dart';
+import 'edit_profile_screen.dart';
+import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  @override State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  @override void initState() { super.initState(); _tabs = TabController(length: 3, vsync: this); }
+  @override void dispose() { _tabs.dispose(); super.dispose(); }
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
+  Widget build(BuildContext context) => Scaffold(body: Consumer<AuthProvider>(builder: (context, auth, _) {
+    final user = auth.currentUser; final stats = auth.userStats;
+    return CustomScrollView(slivers: [
+      SliverAppBar(pinned: true, expandedHeight: 290, title: Text(user == null ? 'الملف الشخصي' : '@${user.username}'), actions: [IconButton(icon: const Icon(Icons.share_outlined), onPressed: () => Share.share('@${user?.username ?? 'TikVply'} على TikVply')), IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())))], flexibleSpace: FlexibleSpaceBar(background: _header(user, stats))),
+      SliverPersistentHeader(pinned: true, delegate: _TabDelegate(TabBar(controller: _tabs, tabs: const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.bookmark_outline)), Tab(icon: Icon(Icons.favorite_border))]))),
+      SliverFillRemaining(child: TabBarView(controller: _tabs, children: [_videos(), _emptyTab(Icons.bookmark_border, 'الفيديوهات المحفوظة'), _emptyTab(Icons.favorite_border, 'الفيديوهات التي أعجبتك')])),
+    ]);
+  }));
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          final user = authProvider.currentUser;
-          final stats = authProvider.userStats;
-
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                expandedHeight: 260,
-                backgroundColor: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.darkBg
-                    : Colors.white,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: _buildProfileHeader(user, stats),
-                ),
-                title: user != null
-                    ? Text('@${user.username}',
-                        style: const TextStyle(fontWeight: FontWeight.bold))
-                    : null,
-                actions: [
-                  IconButton(icon: const Icon(Icons.share), onPressed: () {}),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert),
-                    onPressed: () => _showSettingsSheet(context),
-                  ),
-                ],
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverTabBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: AppColors.dark,
-                    indicatorWeight: 2,
-                    labelColor: AppColors.dark,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.grid_on)),
-                      Tab(icon: Icon(Icons.bookmark_outline)),
-                      Tab(icon: Icon(Icons.favorite_border)),
-                    ],
-                  ),
-                ),
-              ),
-              SliverFillRemaining(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildVideoGrid(),
-                    _buildSavedGrid(),
-                    _buildLikedGrid(),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(UserModel? user, stats) {
-    return Container(
-      padding: const EdgeInsets.only(top: 60),
-      child: Column(
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5))],
-            ),
-            child: ClipOval(
-              child: user?.avatarUrl != null
-                  ? Image.network(user!.avatarUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildDefaultAvatar())
-                  : _buildDefaultAvatar(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(user?.fullName ?? 'User', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              if (user?.isVerified == true) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.verified, color: AppColors.primary, size: 18),
-              ],
-            ],
-          ),
-          const SizedBox(height: 4),
-          if (user?.bio != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(user!.bio!, textAlign: TextAlign.center, maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-            ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildStatItem(stats.followingCount.toString(), 'Following'),
-                _buildStatItem(stats.followersCount.toString(), 'Followers'),
-                _buildStatItem(stats.likesCount.toString(), 'Likes'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.dark,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Edit Profile'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: IconButton(icon: const Icon(Icons.bookmark_border), onPressed: () {}),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDefaultAvatar() => Container(color: AppColors.primary, child: const Icon(Icons.person, color: Colors.white, size: 50));
-
-  Widget _buildStatItem(String count, String label) => Column(
-    children: [
-      Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 2),
-      Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-    ],
-  );
-
-  Widget _buildVideoGrid() => Consumer<VideoProvider>(
-    builder: (context, videoProvider, child) => GridView.builder(
-      padding: const EdgeInsets.all(2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2, childAspectRatio: 9 / 16,
-      ),
-      itemCount: videoProvider.videos.length,
-      itemBuilder: (context, index) {
-        final video = videoProvider.videos[index];
-        return GestureDetector(
-          onTap: () => videoProvider.setCurrentIndex(index),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              video.thumbnailUrl != null
-                  ? Image.network(video.thumbnailUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder())
-                  : _placeholder(),
-              Positioned(
-                left: 6, bottom: 6,
-                child: Row(children: [
-                  const Icon(Icons.play_arrow, color: Colors.white, size: 14),
-                  const SizedBox(width: 2),
-                  Text(video.formatViews(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                ]),
-              ),
-            ],
-          ),
-        );
-      },
-    ),
-  );
-
-  Widget _placeholder() => Container(color: AppColors.primary.withValues(alpha: 0.3), child: const Icon(Icons.play_arrow, color: Colors.white, size: 40));
-
-  Widget _buildSavedGrid() => const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Icon(Icons.bookmark_border, size: 64, color: Colors.grey), SizedBox(height: 16),
-    Text('No saved videos yet', style: TextStyle(fontSize: 16, color: Colors.grey)),
+  Widget _header(UserModel? user, dynamic stats) => Container(padding: const EdgeInsets.only(top: 75), child: Column(children: [
+    CircleAvatar(radius: 48, backgroundColor: AppColors.primary, backgroundImage: user?.avatarUrl == null ? null : NetworkImage(user!.avatarUrl!), child: user?.avatarUrl == null ? const Icon(Icons.person, color: Colors.white, size: 44) : null),
+    const SizedBox(height: 10), Text(user?.fullName ?? 'مستخدم TikVply', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+    if (user?.bio != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 5), child: Text(user!.bio!, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
+    const SizedBox(height: 8), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_stat('المتابَعون', 'followersCount', stats), _stat('أتابع', 'followingCount', stats), _stat('الإعجابات', 'likesCount', stats)]),
+    const SizedBox(height: 12), Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())), icon: const Icon(Icons.edit_outlined), label: const Text('تعديل الملف'))), const SizedBox(width: 10), OutlinedButton(onPressed: () => _showAccountMenu(context), child: const Icon(Icons.more_horiz))])),
   ]));
 
-  Widget _buildLikedGrid() => const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Icon(Icons.favorite_border, size: 64, color: Colors.grey), SizedBox(height: 16),
-    Text('Videos you liked will appear here', style: TextStyle(fontSize: 16, color: Colors.grey)),
-  ]));
+  Widget _stat(String label, String key, dynamic s) { final v = key == 'followersCount' ? s.followersCount : key == 'followingCount' ? s.followingCount : s.likesCount; return InkWell(onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label: $v'))), child: Column(children: [Text('$v', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), Text(label, style: const TextStyle(fontSize: 12))])); }
 
-  void _showSettingsSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(leading: const Icon(Icons.settings), title: const Text('Settings'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('Privacy'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.qr_code), title: const Text('QR Code'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.bookmark_border), title: const Text('Saved'), onTap: () => Navigator.pop(context)),
-          const Divider(),
-          ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text('Logout', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); }),
-        ]),
-      ),
-    );
-  }
+  Widget _videos() => Consumer<VideoProvider>(builder: (context, p, _) => GridView.builder(padding: const EdgeInsets.all(2), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2, childAspectRatio: 9 / 16), itemCount: p.videos.length, itemBuilder: (_, i) { final v = p.videos[i]; return InkWell(onTap: () { p.setCurrentIndex(i); Navigator.popUntil(context, (r) => r.isFirst); }, child: Stack(fit: StackFit.expand, children: [v.thumbnailUrl != null ? Image.network(v.thumbnailUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder()) : _placeholder(), Positioned(left: 5, bottom: 5, child: Row(children: [const Icon(Icons.play_arrow, color: Colors.white, size: 14), Text(v.formatViews(), style: const TextStyle(color: Colors.white, fontSize: 11))]))])); }));
+  Widget _placeholder() => Container(color: AppColors.primary.withValues(alpha: .25), child: const Icon(Icons.play_arrow, color: Colors.white, size: 36));
+  Widget _emptyTab(IconData icon, String text) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, size: 64, color: Colors.grey), const SizedBox(height: 12), Text(text, style: const TextStyle(color: Colors.grey, fontSize: 16))]));
+
+  void _showAccountMenu(BuildContext context) => showModalBottomSheet(context: context, builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [ListTile(leading: const Icon(Icons.settings_outlined), title: const Text('الإعدادات'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); }), ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('الخصوصية'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))), const Divider(), ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text('تسجيل الخروج', style: TextStyle(color: Colors.red)), onTap: () async { Navigator.pop(context); await context.read<AuthProvider>().logout(); if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst); })])));
 }
 
-class UserProfileScreen extends StatelessWidget {
-  final String userId;
-  const UserProfileScreen({super.key, required this.userId});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('User Profile')), body: Center(child: Text('Profile for user: $userId')));
-}
-
-class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  _SliverTabBarDelegate(this.tabBar);
-  @override double get minExtent => tabBar.preferredSize.height;
-  @override double get maxExtent => tabBar.preferredSize.height;
-  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => Container(
-    color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkBg : Colors.white,
-    child: tabBar,
-  );
-  @override bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
-}
+class _TabDelegate extends SliverPersistentHeaderDelegate { final TabBar tabBar; _TabDelegate(this.tabBar); @override double get minExtent => tabBar.preferredSize.height; @override double get maxExtent => tabBar.preferredSize.height; @override Widget build(BuildContext c, double s, bool o) => Container(color: Theme.of(c).scaffoldBackgroundColor, child: tabBar); @override bool shouldRebuild(covariant _TabDelegate old) => false; }
