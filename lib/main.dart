@@ -19,17 +19,24 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/upload/upload_screen.dart';
 import 'screens/settings/settings_screen.dart';
-import 'screens/media/media_browser_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light, systemNavigationBarColor: Colors.black, systemNavigationBarIconBrightness: Brightness.light));
-  runApp(const VidHorusApp());
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.black,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
+  runApp(const TikVplyApp());
 }
 
-class VidHorusApp extends StatelessWidget {
-  const VidHorusApp({super.key});
+class TikVplyApp extends StatelessWidget {
+  const TikVplyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +51,7 @@ class VidHorusApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => MaterialApp(
-          title: 'تيك فبلي',
+          title: 'TikVply',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: DarkTheme.darkTheme,
