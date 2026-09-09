@@ -19,6 +19,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/upload/upload_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/media/media_browser_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,23 +30,66 @@ Future<void> main() async {
 
 class VidHorusApp extends StatelessWidget {
   const VidHorusApp({super.key});
+
   @override
-  Widget build(BuildContext context) => MultiProvider(providers: [ChangeNotifierProvider(create: (_) => ThemeProvider()), ChangeNotifierProvider(create: (_) => AuthProvider()), ChangeNotifierProvider(create: (_) => VideoProvider()), ChangeNotifierProvider(create: (_) => VideoSettingsProvider()), ChangeNotifierProvider(create: (_) => NotificationProvider()), ChangeNotifierProvider(create: (_) => UploadProvider())], child: Consumer<ThemeProvider>(builder: (context, theme, _) => MaterialApp(title: 'TikVply', debugShowCheckedModeBanner: false, theme: AppTheme.lightTheme, darkTheme: DarkTheme.darkTheme, themeMode: theme.themeMode, initialRoute: AppRoutes.splash, onGenerateRoute: (settings) => MaterialPageRoute(settings: settings, builder: (_) => _getPage(settings.name, settings.arguments)))));
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => VideoProvider()),
+        ChangeNotifierProvider(create: (_) => VideoSettingsProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => UploadProvider()),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, theme, _) => MaterialApp(
+          title: 'تيك فبلي',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: DarkTheme.darkTheme,
+          themeMode: theme.themeMode,
+          locale: const Locale('ar'),
+          supportedLocales: const [Locale('ar')],
+          builder: (context, child) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          initialRoute: AppRoutes.splash,
+          onGenerateRoute: (settings) => MaterialPageRoute(
+            settings: settings,
+            builder: (_) => _getPage(settings.name, settings.arguments),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _getPage(String? route, Object? args) {
     switch (route) {
-      case AppRoutes.splash: return const SplashScreen();
+      case AppRoutes.splash:
+        return const SplashScreen();
       case AppRoutes.main:
-      case AppRoutes.home: return const MainScreen();
-      case AppRoutes.feed: return const FeedScreen();
-      case AppRoutes.search: return const SearchScreen();
-      case AppRoutes.notifications: return const NotificationsScreen();
-      case AppRoutes.profile: return const ProfileScreen();
-      case AppRoutes.editProfile: return const EditProfileScreen();
-      case AppRoutes.upload: return const UploadScreen();
-      case AppRoutes.settings: return const SettingsScreen();
-      case AppRoutes.userProfile: return UserProfileScreen(userId: args is String ? args : 'unknown');
-      default: return const MainScreen();
+      case AppRoutes.home:
+        return const MainScreen();
+      case AppRoutes.feed:
+        return const FeedScreen();
+      case AppRoutes.search:
+        return const SearchScreen();
+      case AppRoutes.notifications:
+        return const NotificationsScreen();
+      case AppRoutes.profile:
+        return const ProfileScreen();
+      case AppRoutes.editProfile:
+        return const EditProfileScreen();
+      case AppRoutes.upload:
+        return const UploadScreen();
+      case AppRoutes.settings:
+        return const SettingsScreen();
+      case AppRoutes.userProfile:
+        return UserProfileScreen(userId: args is String ? args : 'unknown');
+      default:
+        return const MainScreen();
     }
   }
 }
