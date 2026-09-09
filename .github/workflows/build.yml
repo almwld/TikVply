@@ -69,18 +69,18 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />''')
           s = s.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"')
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"')
-          marker = '        </activity>'
-          intent_block = '''            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="video/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="video/*" />
-            </intent-filter>
+          marker = '    </activity>'
+          intent_block = '''        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:mimeType="video/*" />
+        </intent-filter>
+        <intent-filter>
+            <action android:name="android.intent.action.SEND" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:mimeType="video/*" />
+        </intent-filter>
 '''
           if marker not in s: raise SystemExit('Could not locate MainActivity closing tag')
           s = s.replace(marker, intent_block + marker, 1)
