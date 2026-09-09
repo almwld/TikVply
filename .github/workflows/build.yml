@@ -48,11 +48,20 @@ jobs:
           p.write_text(s)
           PY
           mkdir -p android/app/src/main/res/drawable
-          cp assets/icons/svg/tikvply_logo.svg android/app/src/main/res/drawable/tikvply_logo.svg
+          cat > android/app/src/main/res/drawable/tikvply_launcher.xml <<'XML'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
+            <path android:fillColor="#0A8F83" android:pathData="M112,0 L400,0 Q512,0 512,112 L512,400 Q512,512 400,512 L112,512 Q0,512 0,400 L0,112 Q0,0 112,0 Z"/>
+            <path android:fillColor="#FFFFFFFF" android:pathData="M150,126 L362,126 Q387,126 387,151 L387,361 Q387,386 362,386 L150,386 Q125,386 125,361 L125,151 Q125,126 150,126 Z"/>
+            <path android:fillColor="#0A8F83" android:pathData="M205,190 L307,190 Q330,190 330,213 L330,299 Q330,322 307,322 L205,322 Q182,322 182,299 L182,213 Q182,190 205,190 Z"/>
+            <path android:fillColor="#FFFFFFFF" android:pathData="M244,211 L299,256 L244,301 Z"/>
+            <path android:fillColor="#FFFFFFFF" android:pathData="M163,149 L349,149 L349,167 L163,167 Z"/>
+            <path android:fillColor="#0A8F83" android:pathData="M155,149 A9,9 0,1 0,173 149 A9,9 0,1 0,155 149"/>
+          </vector>
+          XML
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text().replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_logo"')
+          s = p.read_text().replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"')
           p.write_text(s)
           PY
           grep -n 'compileSdk\|android:icon' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
