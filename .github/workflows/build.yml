@@ -40,12 +40,28 @@ jobs:
           flutter create --platforms=android --project-name=tikvply --org=com.tikvply --android-language=kotlin .
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('android/app/build.gradle.kts')
-          s = p.read_text()
-          if 'compileSdk = flutter.compileSdkVersion' in s: s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
-          elif 'compileSdk = 34' in s: s = s.replace('compileSdk = 34', 'compileSdk = 36')
-          else: raise SystemExit('Could not locate compileSdk')
-          p.write_text(s)
+
+          gradle = Path('android/app/build.gradle.kts')
+          text = gradle.read_text()
+          if 'compileSdk = flutter.compileSdkVersion' in text:
+              text = text.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+          elif 'compileSdk = 34' in text:
+              text = text.replace('compileSdk = 34', 'compileSdk = 36')
+          else:
+              raise SystemExit('Could not locate compileSdk')
+          gradle.write_text(text)
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          text = text.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />', 1)
+          text = text.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"', 1)
+          text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"', 1)
+          marker = '    </activity>'
+          intent_block = '\n        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n        <intent-filter>\n            <action android:name="android.intent.action.SEND" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n'
+          if marker not in text:
+              raise SystemExit('Could not locate MainActivity closing tag')
+          text = text.replace(marker, intent_block + marker, 1)
+          manifest.write_text(text)
           PY
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/tikvply_launcher.xml <<'XML'
@@ -58,34 +74,6 @@ jobs:
             <path android:fillColor="#0A8F83" android:pathData="M155,149 A9,9 0,1 0,173 149 A9,9 0,1 0,155 149"/>
           </vector>
           XML
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
-          s = s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />''')
-          s = s.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"')
-          s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"')
-          marker = '    </activity>'
-          intent_block = '''        <intent-filter>
-            <action android:name="android.intent.action.VIEW" />
-            <category android:name="android.intent.category.DEFAULT" />
-            <category android:name="android.intent.category.BROWSABLE" />
-            <data android:mimeType="video/*" />
-        </intent-filter>
-        <intent-filter>
-            <action android:name="android.intent.action.SEND" />
-            <category android:name="android.intent.category.DEFAULT" />
-            <data android:mimeType="video/*" />
-        </intent-filter>
-'''
-          if marker not in s: raise SystemExit('Could not locate MainActivity closing tag')
-          s = s.replace(marker, intent_block + marker, 1)
-          p.write_text(s)
-          PY
           grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
       - name: Install TikVply dependencies
         run: flutter pub get
