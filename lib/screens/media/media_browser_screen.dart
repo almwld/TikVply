@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/feed_provider.dart';
+import '../../services/video_thumbnail_service.dart';
 import '../../widgets/video/video_page.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
@@ -118,11 +119,87 @@ class _MediaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Stack(fit: StackFit.expand, children: [
-        Image.file(File(path), fit: BoxFit.cover, cacheWidth: 420, errorBuilder: (_, __, ___) => const ColoredBox(color: Colors.black12, child: Icon(Icons.video_file_rounded))),
-        const Positioned(bottom: 7, right: 7, child: DecoratedBox(decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: Padding(padding: EdgeInsets.all(5), child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18)))),
-        Positioned(top: 5, left: 5, child: DecoratedBox(decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))))),
-      ]),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _VideoThumbnail(path: path),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black38],
+              ),
+            ),
+          ),
+          const Positioned(
+            bottom: 7,
+            right: 7,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black60, shape: BoxShape.circle),
+              child: Padding(
+                padding: EdgeInsets.all(5),
+                child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 5,
+            left: 5,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoThumbnail extends StatelessWidget {
+  final String path;
+
+  const _VideoThumbnail({required this.path});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: VideoThumbnailService.instance.getThumbnailPath(path),
+      builder: (context, snapshot) {
+        final thumbnailPath = snapshot.data;
+        if (thumbnailPath != null && thumbnailPath.isNotEmpty) {
+          return Image.file(
+            File(thumbnailPath),
+            fit: BoxFit.cover,
+            cacheWidth: 420,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => _fallback(),
+          );
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const ColoredBox(
+            color: Color(0xFF102624),
+            child: Center(
+              child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          );
+        }
+        return _fallback();
+      },
+    );
+  }
+
+  Widget _fallback() {
+    return const ColoredBox(
+      color: Color(0xFF102624),
+      child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 30)),
     );
   }
 }
@@ -156,15 +233,24 @@ class _MediaViewerScreenState extends State<_MediaViewerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Stack(children: [
-          PageView.builder(
-            controller: _controller,
-            scrollDirection: Axis.vertical,
-            itemCount: videos.length,
-            itemBuilder: (_, index) => VideoPage(key: ValueKey(videos[index].id), video: videos[index]),
-          ),
-          Positioned(top: 4, right: 4, child: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30))),
-        ]),
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              scrollDirection: Axis.vertical,
+              itemCount: videos.length,
+              itemBuilder: (_, index) => VideoPage(key: ValueKey(videos[index].id), video: videos[index]),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
