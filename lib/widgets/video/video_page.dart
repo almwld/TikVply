@@ -25,6 +25,7 @@ class _VideoPageState extends State<VideoPage> {
   @override
   void initState() {
     super.initState();
+    _settings.addListener(_applySettings);
     _controller = AVPlayerController(_sourceFor(widget.video.videoUrl));
     _initialize();
   }
@@ -39,9 +40,7 @@ class _VideoPageState extends State<VideoPage> {
   Future<void> _initialize() async {
     try {
       await _controller.initialize();
-      await _controller.setLooping(_settings.loop);
-      await _controller.setVolume(_settings.muted ? 0 : 1);
-      await _controller.setPlaybackSpeed(_settings.playbackSpeed);
+      await _applySettings();
       await _controller.setNotificationEnabled(true);
       await _controller.setMediaMetadata(AVMediaMetadata(
         title: widget.video.caption.isEmpty ? 'TikVply' : widget.video.caption,
@@ -58,8 +57,16 @@ class _VideoPageState extends State<VideoPage> {
     }
   }
 
+  Future<void> _applySettings() async {
+    if (!_controller.value.isInitialized) return;
+    await _controller.setLooping(_settings.loop);
+    await _controller.setVolume(_settings.muted ? 0 : 1);
+    await _controller.setPlaybackSpeed(_settings.playbackSpeed);
+  }
+
   @override
   void dispose() {
+    _settings.removeListener(_applySettings);
     _controller.dispose();
     super.dispose();
   }
