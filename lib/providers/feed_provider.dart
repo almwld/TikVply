@@ -30,14 +30,13 @@ class VideoProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // Restore the last known list immediately, then scan the phone library
-      // asynchronously so videos can appear without a picker dialog.
       final cached = await _localVideoService.loadPaths();
       _setVideos(cached);
       notifyListeners();
       await refreshDeviceVideos(notify: false);
-    } catch (_) {
+    } catch (error) {
       _error = 'تعذر قراءة مكتبة الفيديو في الهاتف';
+      debugPrint('TikVply video library load failed: $error');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -51,27 +50,31 @@ class VideoProvider extends ChangeNotifier {
     if (notify) notifyListeners();
     try {
       final paths = await _deviceMediaService.scanAllVideos();
-      if (paths.isNotEmpty) {
-        await _localVideoService.replacePaths(paths);
-        _setVideos(paths);
-      } else if (_videos.isEmpty) {
-        _setVideos(const <String>[]);
+      if (_deviceMediaService.permissionDenied) {
+        _error = 'يحتاج TikVply إلى إذن الوصول إلى فيديوهات الهاتف';
+        return;
       }
-    } catch (_) {
+
+      // An authorized empty result is meaningful: it means the library is
+      // genuinely empty or its videos were removed, so clear stale cache.
+      await _localVideoService.replacePaths(paths);
+      _setVideos(paths);
+    } catch (error, stackTrace) {
       _error = 'تعذر تحديث مكتبة الفيديو';
+      debugPrint('TikVply video library refresh failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     } finally {
       _isRefreshing = false;
       if (notify) notifyListeners();
     }
   }
 
-  // Kept for compatibility with existing screens. The app no longer opens
-  // a file picker; it always scans the whole accessible phone video library.
   Future<void> importVideos() => refreshDeviceVideos();
 
   void _setVideos(List<String> paths) {
     final user = _localUser();
-    _videos = paths.asMap().entries.map((entry) {
+    final uniquePaths = <String>{...paths}.toList(growable: false);
+    _videos = uniquePaths.asMap().entries.map((entry) {
       final path = entry.value;
       return VideoModel(
         id: 'local_${path.hashCode}',
@@ -84,7 +87,8 @@ class VideoProvider extends ChangeNotifier {
         aspectRatio: 9 / 16,
         createdAt: DateTime.now().subtract(Duration(minutes: entry.key)),
       );
-    }).toList();
+    }).toList(growable: false);
+
     if (_videos.isEmpty) {
       _currentIndex = 0;
     } else if (_currentIndex >= _videos.length) {
