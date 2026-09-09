@@ -77,6 +77,8 @@ jobs:
           grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
       - name: Install TikVply dependencies
         run: flutter pub get
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
       - name: Verify repository assets
         run: |
           test -d assets/images
