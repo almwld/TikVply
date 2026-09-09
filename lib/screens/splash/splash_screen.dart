@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this)..forward();
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: const Interval(0, .6, curve: Curves.easeIn));
     _scaleAnimation = Tween<double>(begin: .5, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0, .7, curve: Curves.easeOutBack)));
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
     });
   }
