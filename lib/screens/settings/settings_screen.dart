@@ -44,12 +44,11 @@ class SettingsScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showSpeed(context, video),
           ),
-          ListTile(
-            leading: const Icon(Icons.gesture),
+          SwitchListTile.adaptive(
+            secondary: const Icon(Icons.gesture),
             title: const Text('إيماءات التحكم'),
             value: video.gesturesEnabled,
-            onTap: () => video.setGesturesEnabled(!video.gesturesEnabled),
-            trailing: Switch(value: video.gesturesEnabled, onChanged: video.setGesturesEnabled),
+            onChanged: video.setGesturesEnabled,
           ),
           _section(context, 'الحساب والتطبيق'),
           ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('الخصوصية'), trailing: const Icon(Icons.chevron_right), onTap: () => _info(context, 'الخصوصية', 'تحكم في بياناتك ومحتواك وإعدادات المشاركة.')),
