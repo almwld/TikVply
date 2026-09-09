@@ -25,8 +25,7 @@ class _VideoPageState extends State<VideoPage> {
   @override
   void initState() {
     super.initState();
-    final source = _sourceFor(widget.video.videoUrl);
-    _controller = AVPlayerController(source);
+    _controller = AVPlayerController(_sourceFor(widget.video.videoUrl));
     _initialize();
   }
 
@@ -49,9 +48,7 @@ class _VideoPageState extends State<VideoPage> {
         artist: 'TikVply',
         album: 'فيديوهات الهاتف',
       ));
-      if (_settings.autoplay) {
-        await _controller.play();
-      }
+      if (_settings.autoplay) await _controller.play();
       if (!mounted) return;
       setState(() => _initialized = true);
       await context.read<VideoProvider>().incrementViews(widget.video.id);
@@ -59,13 +56,6 @@ class _VideoPageState extends State<VideoPage> {
       debugPrint('TikVply AV playback initialization failed: $error');
       if (mounted) setState(() => _initialized = false);
     }
-  }
-
-  Future<void> _applySettings() async {
-    if (!_initialized) return;
-    await _controller.setLooping(_settings.loop);
-    await _controller.setVolume(_settings.muted ? 0 : 1);
-    await _controller.setPlaybackSpeed(_settings.playbackSpeed);
   }
 
   @override
@@ -82,9 +72,7 @@ class _VideoPageState extends State<VideoPage> {
         fit: StackFit.expand,
         children: [
           if (!_initialized)
-            const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
+            const Center(child: CircularProgressIndicator(color: AppColors.primary))
           else
             AVVideoPlayer(
               _controller,
@@ -97,32 +85,27 @@ class _VideoPageState extends State<VideoPage> {
                 horizontalSwipeToSeek: true,
               ),
             ),
-          if (_initialized) _buildTikVplyOverlay(),
+          if (_initialized) _buildOverlay(),
         ],
       ),
     );
   }
 
-  Widget _buildTikVplyOverlay() {
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            left: 12,
-            right: 82,
-            bottom: 108,
-            child: VideoInfo(video: widget.video),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 108,
-            child: IgnorePointer(
-              ignoring: false,
-              child: VideoActions(video: widget.video),
-            ),
-          ),
-        ],
-      ),
+  Widget _buildOverlay() {
+    return Stack(
+      children: [
+        Positioned(
+          left: 12,
+          right: 82,
+          bottom: 108,
+          child: IgnorePointer(child: VideoInfo(video: widget.video)),
+        ),
+        Positioned(
+          right: 12,
+          bottom: 108,
+          child: VideoActions(video: widget.video),
+        ),
+      ],
     );
   }
 }
