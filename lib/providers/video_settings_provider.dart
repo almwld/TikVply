@@ -31,13 +31,18 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool get mediaNotifications => _mediaNotifications;
   bool get keepScreenAwake => _keepScreenAwake;
 
-  VideoSettingsProvider() => _load();
+  VideoSettingsProvider() {
+    _load();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     _playbackSpeed = prefs.getDouble(_speedKey) ?? 1.0;
     final fit = prefs.getString(_fitKey) ?? VideoFitMode.cover.name;
-    _fitMode = VideoFitMode.values.firstWhere((value) => value.name == fit, orElse: () => VideoFitMode.cover);
+    _fitMode = VideoFitMode.values.firstWhere(
+      (value) => value.name == fit,
+      orElse: () => VideoFitMode.cover,
+    );
     _muted = prefs.getBool(_mutedKey) ?? false;
     _autoplay = prefs.getBool(_autoplayKey) ?? true;
     _loop = prefs.getBool(_loopKey) ?? true;
@@ -54,13 +59,20 @@ class VideoSettingsProvider extends ChangeNotifier {
     await prefs.setDouble(_speedKey, _playbackSpeed);
   }
 
-  Future<void> setFitMode(VideoFitMode value) async => _saveString(_fitKey, _fitMode = value);
-  Future<void> setMuted(bool value) async => _saveBool(_mutedKey, _muted = value);
-  Future<void> setAutoplay(bool value) async => _saveBool(_autoplayKey, _autoplay = value);
-  Future<void> setLoop(bool value) async => _saveBool(_loopKey, _loop = value);
-  Future<void> setGesturesEnabled(bool value) async => _saveBool(_gesturesKey, _gesturesEnabled = value);
-  Future<void> setMediaNotifications(bool value) async => _saveBool(_notificationsKey, _mediaNotifications = value);
-  Future<void> setKeepScreenAwake(bool value) async => _saveBool(_wakelockKey, _keepScreenAwake = value);
+  Future<void> setFitMode(VideoFitMode value) async =>
+      _saveString(_fitKey, _fitMode = value);
+  Future<void> setMuted(bool value) async =>
+      _saveBool(_mutedKey, _muted = value);
+  Future<void> setAutoplay(bool value) async =>
+      _saveBool(_autoplayKey, _autoplay = value);
+  Future<void> setLoop(bool value) async =>
+      _saveBool(_loopKey, _loop = value);
+  Future<void> setGesturesEnabled(bool value) async =>
+      _saveBool(_gesturesKey, _gesturesEnabled = value);
+  Future<void> setMediaNotifications(bool value) async =>
+      _saveBool(_notificationsKey, _mediaNotifications = value);
+  Future<void> setKeepScreenAwake(bool value) async =>
+      _saveBool(_wakelockKey, _keepScreenAwake = value);
 
   Future<void> _saveBool(String key, bool value) async {
     notifyListeners();
@@ -85,7 +97,16 @@ class VideoSettingsProvider extends ChangeNotifier {
     _keepScreenAwake = true;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    for (final key in [_speedKey, _fitKey, _mutedKey, _autoplayKey, _loopKey, _gesturesKey, _notificationsKey, _wakelockKey]) {
+    for (final key in [
+      _speedKey,
+      _fitKey,
+      _mutedKey,
+      _autoplayKey,
+      _loopKey,
+      _gesturesKey,
+      _notificationsKey,
+      _wakelockKey,
+    ]) {
       await prefs.remove(key);
     }
   }
