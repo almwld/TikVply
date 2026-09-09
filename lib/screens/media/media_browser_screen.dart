@@ -136,7 +136,7 @@ class _MediaTile extends StatelessWidget {
             bottom: 7,
             right: 7,
             child: DecoratedBox(
-              decoration: BoxDecoration(color: Colors.black60, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
               child: Padding(
                 padding: EdgeInsets.all(5),
                 child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
