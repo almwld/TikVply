@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import '../models/video/video_model.dart';
 import '../models/user/user_model.dart';
 import '../services/local_video_service.dart';
+import '../services/device_media_service.dart';
 
 class VideoProvider extends ChangeNotifier {
   final LocalVideoService _localVideoService = LocalVideoService();
+  final DeviceMediaService _deviceMediaService = DeviceMediaService();
   List<VideoModel> _videos = [];
   int _currentIndex = 0;
   bool _isLoading = false;
+  bool _isRefreshing = false;
   String? _error;
 
   List<VideoModel> get videos => List.unmodifiable(_videos);
   int get currentIndex => _currentIndex;
   bool get isLoading => _isLoading;
+  bool get isRefreshing => _isRefreshing;
   String? get error => _error;
   bool get hasVideos => _videos.isNotEmpty;
 
@@ -22,55 +25,70 @@ class VideoProvider extends ChangeNotifier {
   }
 
   Future<void> loadLocalVideos() async {
+    if (_isLoading) return;
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      final paths = await _localVideoService.loadPaths();
-      final user = _localUser();
-      _videos = paths.asMap().entries.map((entry) {
-        final path = entry.value;
-        return VideoModel(
-          id: 'local_${path.hashCode}',
-          userId: 'local_user',
-          user: user,
-          videoUrl: path,
-          caption: path.split(RegExp(r'[/\\]')).last,
-          duration: '—',
-          quality: 'Local',
-          aspectRatio: 9 / 16,
-          createdAt: DateTime.now().subtract(Duration(minutes: entry.key)),
-        );
-      }).toList();
-      if (_videos.isEmpty) {
-        _currentIndex = 0;
-      } else if (_currentIndex >= _videos.length) {
-        _currentIndex = _videos.length - 1;
-      }
-    } catch (e) {
-      _error = 'تعذر قراءة مكتبة الفيديو المحلية';
+      // Restore the last known list immediately, then scan the phone library
+      // asynchronously so videos can appear without a picker dialog.
+      final cached = await _localVideoService.loadPaths();
+      _setVideos(cached);
+      notifyListeners();
+      await refreshDeviceVideos(notify: false);
+    } catch (_) {
+      _error = 'تعذر قراءة مكتبة الفيديو في الهاتف';
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> importVideos() async {
+  Future<void> refreshDeviceVideos({bool notify = true}) async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    _error = null;
+    if (notify) notifyListeners();
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.video,
-        allowMultiple: true,
-        withData: false,
-      );
-      if (result == null) return;
-      for (final file in result.files) {
-        final path = file.path;
-        if (path != null && path.isNotEmpty) await _localVideoService.addPath(path);
+      final paths = await _deviceMediaService.scanAllVideos();
+      if (paths.isNotEmpty) {
+        await _localVideoService.replacePaths(paths);
+        _setVideos(paths);
+      } else if (_videos.isEmpty) {
+        _setVideos(const <String>[]);
       }
-      await loadLocalVideos();
-    } catch (e) {
-      _error = 'تعذر استيراد الفيديو';
-      notifyListeners();
+    } catch (_) {
+      _error = 'تعذر تحديث مكتبة الفيديو';
+    } finally {
+      _isRefreshing = false;
+      if (notify) notifyListeners();
+    }
+  }
+
+  // Kept for compatibility with existing screens. The app no longer opens
+  // a file picker; it always scans the whole accessible phone video library.
+  Future<void> importVideos() => refreshDeviceVideos();
+
+  void _setVideos(List<String> paths) {
+    final user = _localUser();
+    _videos = paths.asMap().entries.map((entry) {
+      final path = entry.value;
+      return VideoModel(
+        id: 'local_${path.hashCode}',
+        userId: 'local_user',
+        user: user,
+        videoUrl: path,
+        caption: path.split(RegExp(r'[/\\]')).last,
+        duration: '—',
+        quality: 'محلي',
+        aspectRatio: 9 / 16,
+        createdAt: DateTime.now().subtract(Duration(minutes: entry.key)),
+      );
+    }).toList();
+    if (_videos.isEmpty) {
+      _currentIndex = 0;
+    } else if (_currentIndex >= _videos.length) {
+      _currentIndex = _videos.length - 1;
     }
   }
 
@@ -126,8 +144,8 @@ class VideoProvider extends ChangeNotifier {
 
   UserModel _localUser() => UserModel(
         id: 'local_user',
-        username: 'local_library',
-        email: 'local@vidhorus.app',
+        username: 'مكتبة الهاتف',
+        email: 'local@tikvply.app',
         fullName: 'فيديوهاتي',
         avatarUrl: null,
         isVerified: false,
