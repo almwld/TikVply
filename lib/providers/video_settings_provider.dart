@@ -31,9 +31,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool get mediaNotifications => _mediaNotifications;
   bool get keepScreenAwake => _keepScreenAwake;
 
-  VideoSettingsProvider() {
-    _load();
-  }
+  VideoSettingsProvider() => _load();
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -49,7 +47,13 @@ class VideoSettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setPlaybackSpeed(double value) async => _saveDouble(_speedKey, _playbackSpeed = value.clamp(0.25, 3.0));
+  Future<void> setPlaybackSpeed(double value) async {
+    _playbackSpeed = value.clamp(0.25, 3.0).toDouble();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_speedKey, _playbackSpeed);
+  }
+
   Future<void> setFitMode(VideoFitMode value) async => _saveString(_fitKey, _fitMode = value);
   Future<void> setMuted(bool value) async => _saveBool(_mutedKey, _muted = value);
   Future<void> setAutoplay(bool value) async => _saveBool(_autoplayKey, _autoplay = value);
@@ -62,12 +66,6 @@ class VideoSettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
-  }
-
-  Future<void> _saveDouble(String key, double value) async {
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(key, value);
   }
 
   Future<void> _saveString(String key, VideoFitMode value) async {
