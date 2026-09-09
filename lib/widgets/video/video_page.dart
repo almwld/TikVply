@@ -41,9 +41,8 @@ class _VideoPageState extends State<VideoPage> {
     try {
       await _controller.initialize();
       await _applySettings();
-      await _controller.setNotificationEnabled(true);
       await _controller.setMediaMetadata(AVMediaMetadata(
-        title: widget.video.caption.isEmpty ? 'TikVply' : widget.video.caption,
+        title: (widget.video.caption ?? '').trim().isEmpty ? 'TikVply' : widget.video.caption!,
         artist: 'TikVply',
         album: 'فيديوهات الهاتف',
       ));
@@ -51,8 +50,9 @@ class _VideoPageState extends State<VideoPage> {
       if (!mounted) return;
       setState(() => _initialized = true);
       await context.read<VideoProvider>().incrementViews(widget.video.id);
-    } catch (error) {
+    } catch (error, stackTrace) {
       debugPrint('TikVply AV playback initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) setState(() => _initialized = false);
     }
   }
@@ -62,6 +62,8 @@ class _VideoPageState extends State<VideoPage> {
     await _controller.setLooping(_settings.loop);
     await _controller.setVolume(_settings.muted ? 0 : 1);
     await _controller.setPlaybackSpeed(_settings.playbackSpeed);
+    await _controller.setNotificationEnabled(_settings.mediaNotifications);
+    await _controller.setWakelock(_settings.keepScreenAwake);
   }
 
   @override
@@ -81,19 +83,38 @@ class _VideoPageState extends State<VideoPage> {
           if (!_initialized)
             const Center(child: CircularProgressIndicator(color: AppColors.primary))
           else
-            AVVideoPlayer(
-              _controller,
-              showControls: true,
-              gestureConfig: const AVGestureConfig(
-                doubleTapToSeek: true,
-                seekDuration: Duration(seconds: 10),
-                longPressSpeed: true,
-                longPressSpeedMultiplier: 2.0,
-                horizontalSwipeToSeek: true,
-              ),
-            ),
+            _buildPlayer(),
           if (_initialized) _buildOverlay(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlayer() {
+    final settings = context.watch<VideoSettingsProvider>();
+    final fit = switch (settings.fitMode) {
+      VideoFitMode.cover => BoxFit.cover,
+      VideoFitMode.contain => BoxFit.contain,
+      VideoFitMode.fill => BoxFit.fill,
+    };
+
+    return FittedBox(
+      fit: fit,
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(
+        width: MediaQuery.sizeOf(context).width,
+        height: MediaQuery.sizeOf(context).height,
+        child: AVVideoPlayer(
+          _controller,
+          showControls: true,
+          gestureConfig: AVGestureConfig(
+            doubleTapToSeek: settings.gesturesEnabled,
+            seekDuration: const Duration(seconds: 10),
+            longPressSpeed: settings.gesturesEnabled,
+            longPressSpeedMultiplier: 2.0,
+            horizontalSwipeToSeek: settings.gesturesEnabled,
+          ),
+        ),
       ),
     );
   }
