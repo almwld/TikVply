@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vid_horus/models/user/user_model.dart';
-import 'package:vid_horus/models/video/video_model.dart';
+import 'package:tikvply/models/user/user_model.dart';
+import 'package:tikvply/models/video/video_model.dart';
 
 void main() {
   test('formats video counters', () {
@@ -10,7 +10,7 @@ void main() {
       user: UserModel(
         id: 'local_user',
         username: 'local_library',
-        email: 'local@vidhorus.app',
+        email: 'local@tikvply.app',
         createdAt: DateTime(2026),
       ),
       videoUrl: '/tmp/video.mp4',
