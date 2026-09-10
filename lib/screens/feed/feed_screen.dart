@@ -19,6 +19,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
+  bool _bottomBarVisible = true;
+  double _lastFeedPage = 0;
+  bool _feedPageKnown = false;
 
   @override
   void initState() {
@@ -35,12 +38,32 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() { _pageController.dispose(); super.dispose(); }
 
+  void _setBottomBarVisible(bool visible) {
+    if (_bottomBarVisible == visible || !mounted) return;
+    setState(() => _bottomBarVisible = visible);
+  }
+
+  void _onFeedPageChanged(double page) {
+    if (!_feedPageKnown) {
+      _lastFeedPage = page;
+      _feedPageKnown = true;
+      return;
+    }
+    final delta = page - _lastFeedPage;
+    if (delta.abs() >= 0.04) {
+      // Scrolling down to the next video hides the bar; scrolling back reveals it.
+      _setBottomBarVisible(delta < 0);
+      _lastFeedPage = page;
+    }
+  }
+
   void _onTabTapped(int index) {
     if (index == 2) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const MediaBrowserScreen()));
       return;
     }
     final page = index > 2 ? index - 1 : index;
+    _setBottomBarVisible(true);
     setState(() => _currentIndex = page);
     _pageController.animateToPage(page, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
   }
@@ -61,10 +84,31 @@ class _MainScreenState extends State<MainScreen> {
           body: PageView(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
-            onPageChanged: (i) => setState(() => _currentIndex = i),
-            children: const [FeedScreen(), SearchScreen(), SizedBox.shrink(), NotificationsScreen(), ProfileScreen()],
+            onPageChanged: (i) {
+              setState(() => _currentIndex = i);
+              _setBottomBarVisible(true);
+            },
+            children: [
+              FeedScreen(onVerticalPageChanged: _onFeedPageChanged),
+              const SearchScreen(),
+              const SizedBox.shrink(),
+              const NotificationsScreen(),
+              const ProfileScreen(),
+            ],
           ),
-          bottomNavigationBar: _buildBottomNavBar(),
+          bottomNavigationBar: IgnorePointer(
+            ignoring: !_bottomBarVisible,
+            child: AnimatedSlide(
+              offset: _bottomBarVisible ? Offset.zero : const Offset(0, 1.15),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: _bottomBarVisible ? 1 : 0,
+                duration: const Duration(milliseconds: 160),
+                child: _buildBottomNavBar(),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -99,7 +143,8 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key});
+  const FeedScreen({super.key, this.onVerticalPageChanged});
+  final ValueChanged<double>? onVerticalPageChanged;
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
@@ -108,9 +153,10 @@ class _FeedScreenState extends State<FeedScreen> {
   late final PageController _controller;
   bool _following = false;
   @override
-  void initState() { super.initState(); _controller = PageController(); }
+  void initState() { super.initState(); _controller = PageController()..addListener(_handleVerticalScroll); }
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() { _controller.removeListener(_handleVerticalScroll); _controller.dispose(); super.dispose(); }
+  void _handleVerticalScroll() { if (_controller.hasClients && _controller.page != null) widget.onVerticalPageChanged?.call(_controller.page!); }
 
   @override
   Widget build(BuildContext context) {
