@@ -14,7 +14,8 @@ import 'video_info.dart';
 class VideoPage extends StatefulWidget {
   final VideoModel video;
   const VideoPage({super.key, required this.video});
-  @override State<VideoPage> createState() => _VideoPageState();
+  @override
+  State<VideoPage> createState() => _VideoPageState();
 }
 
 class _VideoPageState extends State<VideoPage> {
@@ -36,22 +37,42 @@ class _VideoPageState extends State<VideoPage> {
   }
 
   Future<void> _initializeVideo() async {
-    final old = _controller;
+    final previous = _controller;
     _controller = null;
-    if (old != null) await old.dispose();
+    if (previous != null) await previous.dispose();
     if (mounted) setState(() { _loading = true; _error = null; });
+
     try {
-      final controller = _isNetwork ? VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl)) : VideoPlayerController.file(File(widget.video.videoUrl));
-      _controller = controller;
-      await controller.initialize();
+      final source = _isNetwork
+          ? VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl))
+          : VideoPlayerController.file(File(widget.video.videoUrl));
+      _controller = source;
+      source.addListener(_playerListener);
+      await source.initialize();
       await _applySettings();
       if (!mounted) return;
       setState(() => _loading = false);
+      if (_settings.autoplay) await source.play();
       await context.read<VideoProvider>().incrementViews(widget.video.id);
-    } catch (e, stack) {
-      debugPrint('TikVply video_player initialization failed: $e');
-      debugPrintStack(stackTrace: stack);
-      if (mounted) setState(() { _loading = false; _error = 'تعذر تشغيل هذا الفيديو'; });
+    } catch (error, stackTrace) {
+      debugPrint('TikVply stable video_player error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) setState(() { _loading = false; _error = _errorText(error); });
+    }
+  }
+
+  String _errorText(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('permission') || text.contains('access')) return 'لا يمكن الوصول إلى ملف الفيديو. تحقق من إذن الوسائط.';
+    if (text.contains('source') || text.contains('format') || text.contains('codec')) return 'صيغة الفيديو غير مدعومة على هذا الجهاز.';
+    return 'تعذر تشغيل الفيديو. اضغط إعادة المحاولة.';
+  }
+
+  void _playerListener() {
+    final c = _controller;
+    if (c == null || !mounted || !c.value.isInitialized) return;
+    if (c.value.hasError && _error == null) {
+      setState(() { _loading = false; _error = c.value.errorDescription ?? 'تعذر تشغيل الفيديو'; });
     }
   }
 
@@ -61,7 +82,7 @@ class _VideoPageState extends State<VideoPage> {
     try {
       await c.setLooping(_settings.loop);
       await c.setVolume(_settings.muted ? 0 : 1);
-      if (_settings.autoplay && !c.value.isPlaying && !c.value.isCompleted) await c.play();
+      await c.setPlaybackSpeed(_settings.playbackSpeed);
     } catch (_) {}
   }
 
@@ -76,30 +97,37 @@ class _VideoPageState extends State<VideoPage> {
     final provider = context.read<VideoProvider>();
     if (!widget.video.isLiked) provider.likeVideo(widget.video.id);
     setState(() { _showLikeAnimation = true; _likePosition = details.localPosition; });
-    Future.delayed(const Duration(milliseconds: 700), () { if (mounted) setState(() => _showLikeAnimation = false); });
+    Future.delayed(const Duration(milliseconds: 650), () { if (mounted) setState(() => _showLikeAnimation = false); });
   }
 
   void _seekBy(int seconds) {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     final target = c.value.position + Duration(seconds: seconds);
-    final max = c.value.duration;
-    c.seekTo(target < Duration.zero ? Duration.zero : target > max ? max : target);
+    final duration = c.value.duration;
+    c.seekTo(target < Duration.zero ? Duration.zero : target > duration ? duration : target);
   }
 
   @override
   void dispose() {
     _settings.removeListener(_applySettings);
-    _controller?.dispose();
+    final c = _controller;
+    if (c != null) c.removeListener(_playerListener);
+    c?.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ColoredBox(color: Colors.black, child: Stack(fit: StackFit.expand, children: [
-    if (_loading) const _VideoLoadingShimmer() else if (_error != null) _errorView() else _playerView(),
-    if (!_loading && _error == null) _overlay(),
-    if (_showLikeAnimation) _likeAnimation(),
-  ]));
+  Widget build(BuildContext context) => ColoredBox(
+    color: Colors.black,
+    child: Stack(fit: StackFit.expand, children: [
+      if (_loading) const _VideoLoadingShimmer()
+      else if (_error != null) _errorView()
+      else _playerView(),
+      if (!_loading && _error == null) _overlay(),
+      if (_showLikeAnimation) _likeAnimation(),
+    ]),
+  );
 
   Widget _playerView() {
     final c = _controller!;
@@ -107,12 +135,25 @@ class _VideoPageState extends State<VideoPage> {
       behavior: HitTestBehavior.opaque,
       onTap: _togglePlay,
       onDoubleTapDown: _onDoubleTap,
-      onDoubleTap: () {},
-      onHorizontalDragEnd: (details) { final v = details.primaryVelocity ?? 0; if (v.abs() > 350) _seekBy(v < 0 ? 10 : -10); },
-      child: Center(child: ValueListenableBuilder<VideoPlayerValue>(valueListenable: c, builder: (_, value, __) {
-        if (!value.isInitialized) return const _VideoLoadingShimmer();
-        return FittedBox(fit: BoxFit.cover, clipBehavior: Clip.hardEdge, child: SizedBox(width: value.size.width, height: value.size.height, child: VideoPlayer(c)));
-      })),
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity.abs() > 350) _seekBy(velocity < 0 ? 10 : -10);
+      },
+      child: Center(
+        child: ValueListenableBuilder<VideoPlayerValue>(
+          valueListenable: c,
+          builder: (_, value, __) {
+            if (!value.isInitialized) return const _VideoLoadingShimmer();
+            final aspect = value.aspectRatio > 0 ? value.aspectRatio : 9 / 16;
+            final fit = switch (_settings.fitMode) {
+              VideoFitMode.cover => BoxFit.cover,
+              VideoFitMode.contain => BoxFit.contain,
+              VideoFitMode.fill => BoxFit.fill,
+            };
+            return SizedBox.expand(child: FittedBox(fit: fit, clipBehavior: Clip.hardEdge, child: AspectRatio(aspectRatio: aspect, child: VideoPlayer(c))));
+          },
+        ),
+      ),
     );
   }
 
@@ -131,20 +172,42 @@ class _VideoPageState extends State<VideoPage> {
     })),
   ]);
 
-  Widget _errorView() => Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.video_file_rounded, color: Colors.white54, size: 64), const SizedBox(height: 14), Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)), const SizedBox(height: 18), FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة'))])));
+  Widget _errorView() => Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    const Icon(Icons.video_file_rounded, color: Colors.white54, size: 64),
+    const SizedBox(height: 14),
+    Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+    const SizedBox(height: 18),
+    FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+  ])));
 
-  Widget _likeAnimation() => Positioned(left: _likePosition.dx - 50, top: _likePosition.dy - 50, child: TweenAnimationBuilder<double>(tween: Tween(begin: .4, end: 1.15), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, scale, child) => Transform.scale(scale: scale, child: child), child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100)));
+  Widget _likeAnimation() => Positioned(left: _likePosition.dx - 50, top: _likePosition.dy - 50, child: TweenAnimationBuilder<double>(tween: Tween(begin: .35, end: 1.15), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, scale, child) => Transform.scale(scale: scale, child: child), child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100)));
 }
 
-class _TopGradient extends StatelessWidget { const _TopGradient(); @override Widget build(BuildContext context) => Container(height: 120, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent]))); }
+class _TopGradient extends StatelessWidget {
+  const _TopGradient();
+  @override
+  Widget build(BuildContext context) => Container(height: 120, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])));
+}
 
 class _VideoLoadingShimmer extends StatelessWidget {
   const _VideoLoadingShimmer();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(baseColor: const Color(0xFF111111), highlightColor: const Color(0xFF303030), child: Stack(fit: StackFit.expand, children: [
-    const ColoredBox(color: Color(0xFF171717)),
-    Align(alignment: Alignment.center, child: Container(width: 82, height: 82, decoration: const BoxDecoration(color: Color(0xFF292929), shape: BoxShape.circle))),
-    Positioned(left: 16, right: 90, bottom: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 190, height: 14, decoration: BoxDecoration(color: const Color(0xFF292929), borderRadius: BorderRadius.circular(8))), const SizedBox(height: 10), Container(width: 130, height: 12, decoration: BoxDecoration(color: const Color(0xFF292929), borderRadius: BorderRadius.circular(8)))])),
-    Positioned(right: 14, bottom: 130, child: Column(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsets.only(bottom: 14), child: Container(width: 42, height: 42, decoration: const BoxDecoration(color: Color(0xFF292929), shape: BoxShape.circle)))])),
-  ]));
+  Widget build(BuildContext context) => Shimmer.fromColors(
+    baseColor: const Color(0xFF101817),
+    highlightColor: const Color(0xFF2B3836),
+    period: const Duration(milliseconds: 1150),
+    child: Stack(fit: StackFit.expand, children: [
+      const ColoredBox(color: Color(0xFF171F1E)),
+      Center(child: Container(width: 86, height: 86, decoration: const BoxDecoration(color: Color(0xFF26302F), shape: BoxShape.circle))),
+      Positioned(left: 16, right: 88, bottom: 104, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 205, height: 15, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))),
+        const SizedBox(height: 10),
+        Container(width: 145, height: 12, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))),
+        const SizedBox(height: 9),
+        Container(width: 230, height: 9, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(6))),
+      ])),
+      Positioned(right: 14, bottom: 128, child: Column(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsets.only(bottom: 15), child: Container(width: 45, height: 45, decoration: const BoxDecoration(color: Color(0xFF293331), shape: BoxShape.circle)))])),
+      const Positioned(left: 14, right: 14, bottom: 18, child: SizedBox(height: 4, child: ColoredBox(color: Color(0xFF293331)))),
+    ]),
+  );
 }
