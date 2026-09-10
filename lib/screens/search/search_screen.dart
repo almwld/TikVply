@@ -1,24 +1,42 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
-import '../../core/constants/app_colors.dart';
-import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/video/video_page.dart';
 
-class SearchScreen extends StatefulWidget { const SearchScreen({super.key}); @override State<SearchScreen> createState() => _SearchScreenState(); }
-class _SearchScreenState extends State<SearchScreen> {
-  final _controller = TextEditingController(); final _focus = FocusNode(); String _query = ''; int _category = 0;
-  final _categories = const ['الكل','الأحدث','الأكثر مشاهدة','المحفوظة'];
-  @override void dispose() { _controller.dispose(); _focus.dispose(); super.dispose(); }
-  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('اكتشف'), centerTitle: false, actions: [IconButton(onPressed: _focus.requestFocus, icon: const Icon(Icons.search_rounded))]), body: Consumer<VideoProvider>(builder: (context,p,_) { final videos=_filtered(p.videos); return RefreshIndicator(onRefresh:p.refreshDeviceVideos, child: CustomScrollView(slivers:[SliverToBoxAdapter(child:_header(p.videos.length)),SliverToBoxAdapter(child:_searchBox()),SliverToBoxAdapter(child:SizedBox(height:52,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:16,vertical:6),itemCount:_categories.length,separatorBuilder:(_,__)=>const SizedBox(width:8),itemBuilder:(_,i)=>ChoiceChip(label:Text(_categories[i]),selected:_category==i,onSelected:(_)=>setState(()=>_category=i))))),if(p.isLoading&&p.videos.isEmpty)const SliverFillRemaining(hasScrollBody:false,child:_DiscoverShimmer()),if(!p.isLoading&&videos.isEmpty)SliverFillRemaining(hasScrollBody:false,child:_empty()),if(!p.isLoading&&videos.isNotEmpty)SliverPadding(padding:const EdgeInsets.all(7),sliver:SliverGrid.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,crossAxisSpacing:7,mainAxisSpacing:8,childAspectRatio:.68),itemCount:videos.length,itemBuilder:(_,i)=>_VideoCard(video:videos[i],onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>VideoPage(video:videos[i])))))),const SliverToBoxAdapter(child:SizedBox(height:24))])); });
-  Widget _header(int count)=>Padding(padding:const EdgeInsets.fromLTRB(18,16,18,8),child:Row(children:[Container(width:48,height:48,decoration:BoxDecoration(color:AppColors.primary.withValues(alpha:.1),borderRadius:BorderRadius.circular(15)),child:const Icon(Icons.explore_rounded,color:AppColors.primary,size:27)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('اكتشف',style:TextStyle(fontSize:24,fontWeight:FontWeight.w800)),Text('$count فيديو في مكتبتك',style:const TextStyle(color:Colors.grey))]))]));
-  Widget _searchBox()=>Padding(padding:const EdgeInsets.fromLTRB(16,8,16,5),child:TextField(controller:_controller,focusNode:_focus,textDirection:TextDirection.rtl,onChanged:(v)=>setState(()=>_query=v.trim().toLowerCase()),decoration:InputDecoration(hintText:'ابحث باسم الفيديو أو الحساب...',prefixIcon:const Icon(Icons.search_rounded),suffixIcon:_query.isEmpty?null:IconButton(onPressed:(){_controller.clear();setState(()=>_query='');},icon:const Icon(Icons.clear_rounded)),filled:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(18),borderSide:BorderSide.none))));
-  List<VideoModel> _filtered(List<VideoModel> source){var list=[...source];if(_query.isNotEmpty)list=list.where((v)=>'${v.caption??''} ${v.user?.username??''}'.toLowerCase().contains(_query)).toList();switch(_category){case 1:list.sort((a,b)=>b.createdAt.compareTo(a.createdAt));break;case 2:list.sort((a,b)=>b.viewsCount.compareTo(a.viewsCount));break;case 3:list=list.where((v)=>v.isSaved).toList();}return list;}
-  Widget _empty()=>Center(child:Padding(padding:const EdgeInsets.all(32),child:Column(mainAxisSize:MainAxisSize.min,children:[Icon(_query.isEmpty?Icons.video_library_outlined:Icons.search_off_rounded,size:74,color:Colors.grey),const SizedBox(height:14),Text(_query.isEmpty?'لا توجد فيديوهات بعد':'لا توجد نتائج',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:8),Text(_query.isEmpty?'حدّث مكتبة الهاتف لاكتشاف الفيديوهات تلقائيًا.':'جرّب كلمة بحث أخرى.',textAlign:TextAlign.center,style:const TextStyle(color:Colors.grey)),const SizedBox(height:18),if(_query.isEmpty)FilledButton.icon(onPressed:context.read<VideoProvider>().refreshDeviceVideos,icon:const Icon(Icons.sync_rounded),label:const Text('تحديث المكتبة'))])));
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+  @override State<SearchScreen> createState() => _SearchScreenState();
 }
-class _VideoCard extends StatelessWidget{final VideoModel video;final VoidCallback onTap;const _VideoCard({required this.video,required this.onTap});@override Widget build(BuildContext context)=>Material(color:Colors.transparent,child:InkWell(borderRadius:BorderRadius.circular(15),onTap:onTap,child:ClipRRect(borderRadius:BorderRadius.circular(15),child:Stack(fit:StackFit.expand,children:[_Thumbnail(path:video.videoUrl),const DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Colors.black87]))),Positioned(left:10,right:10,bottom:9,child:Text(video.caption??'فيديو',maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w700,fontSize:12))),const Positioned(right:9,top:9,child:CircleAvatar(radius:16,backgroundColor:Colors.white,child:Icon(Icons.play_arrow_rounded,color:AppColors.primary,size:20))]))));}
-class _Thumbnail extends StatelessWidget{final String path;const _Thumbnail({required this.path});@override Widget build(BuildContext context){if(path.startsWith('http'))return Image.network(path,fit:BoxFit.cover,errorBuilder:(_,__,___)=>_fallback());return FutureBuilder<String?>(future:VideoThumbnailService.instance.getThumbnailPath(path),builder:(_,s)=>s.hasData&&s.data!.isNotEmpty?Image.file(File(s.data!),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_fallback()):_fallback());}Widget _fallback()=>const ColoredBox(color:AppColors.dark,child:Center(child:Icon(Icons.video_file_rounded,color:Colors.white54,size:42)));}
-class _DiscoverShimmer extends StatelessWidget{const _DiscoverShimmer();@override Widget build(BuildContext context)=>Shimmer.fromColors(baseColor:Colors.black12,highlightColor:Colors.white70,period:const Duration(milliseconds:1100),child:GridView.builder(padding:const EdgeInsets.all(7),itemCount:6,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,crossAxisSpacing:7,mainAxisSpacing:8,childAspectRatio:.68),itemBuilder:(_,__)=>ClipRRect(borderRadius:BorderRadius.circular(15),child:const ColoredBox(color:Colors.white))));}
+
+class _SearchScreenState extends State<SearchScreen> {
+  String query = '';
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('اكتشف')),
+      body: Consumer<VideoProvider>(builder: (context, provider, _) {
+        final list = provider.videos.where((v) => query.isEmpty || '${v.caption ?? ''} ${v.user?.username ?? ''}'.toLowerCase().contains(query)).toList();
+        if (provider.isLoading && list.isEmpty) return const Center(child: CircularProgressIndicator());
+        return RefreshIndicator(
+          onRefresh: provider.refreshDeviceVideos,
+          child: Column(children: [
+            Padding(padding: const EdgeInsets.all(12), child: TextField(onChanged: (v) => setState(() => query = v.trim().toLowerCase()), decoration: const InputDecoration(hintText: 'ابحث عن فيديو...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()))),
+            Expanded(child: list.isEmpty ? const Center(child: Text('لا توجد نتائج')) : GridView.builder(padding: const EdgeInsets.all(6), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 6, mainAxisSpacing: 6, childAspectRatio: .68), itemCount: list.length, itemBuilder: (context, i) { final video = list[i]; return InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VideoPage(video: video))), child: ClipRRect(borderRadius: BorderRadius.circular(12), child: _Thumb(path: video.videoUrl))); })),
+          ]),
+        );
+      }),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  final String path;
+  const _Thumb({required this.path});
+  @override Widget build(BuildContext context) {
+    if (path.startsWith('http')) return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback());
+    return FutureBuilder<String?>(future: VideoThumbnailService.instance.getThumbnailPath(path), builder: (_, s) => s.hasData && s.data!.isNotEmpty ? Image.file(File(s.data!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback()) : _fallback());
+  }
+  Widget _fallback() => const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 40)));
+}
