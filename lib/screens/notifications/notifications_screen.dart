@@ -1,19 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
-import '../../core/constants/app_colors.dart';
 import '../../providers/notification_provider.dart';
 import '../../models/notification/notification_model.dart';
 
-class NotificationsScreen extends StatefulWidget { const NotificationsScreen({super.key}); @override State<NotificationsScreen> createState()=>_NotificationsScreenState(); }
-class _NotificationsScreenState extends State<NotificationsScreen>{ int _filter=0; final _filters=const ['الكل','الإعجابات','التعليقات','المتابعات'];
- @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('التنبيهات'),actions:[Consumer<NotificationProvider>(builder:(_,p,__){if(p.unreadCount==0)return const SizedBox.shrink();return TextButton(onPressed:p.markAllAsRead,child:const Text('قراءة الكل'));})]),body:Consumer<NotificationProvider>(builder:(context,p,_){final list=_filtered(p.notifications);return RefreshIndicator(onRefresh:p.loadNotifications,child:CustomScrollView(slivers:[SliverToBoxAdapter(child:_header(p.unreadCount)),SliverToBoxAdapter(child:SizedBox(height:54,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:16,vertical:6),itemCount:_filters.length,separatorBuilder:(_,__)=>const SizedBox(width:8),itemBuilder:(_,i)=>ChoiceChip(label:Text(_filters[i]),selected:_filter==i,onSelected:(_)=>setState(()=>_filter=i))))),if(p.isLoading)const SliverFillRemaining(hasScrollBody:false,child:_NotificationShimmer()),if(!p.isLoading&&list.isEmpty)SliverFillRemaining(hasScrollBody:false,child:_empty()),if(!p.isLoading&&list.isNotEmpty)SliverList(delegate:SliverChildBuilderDelegate((_,i)=>_NotificationTile(notification:list[i]),childCount:list.length)),const SliverToBoxAdapter(child:SizedBox(height:20))]));});
- Widget _header(int unread)=>Padding(padding:const EdgeInsets.fromLTRB(18,14,18,6),child:Row(children:[Container(width:48,height:48,decoration:BoxDecoration(color:AppColors.primary.withValues(alpha:.1),borderRadius:BorderRadius.circular(15)),child:const Icon(Icons.notifications_active_rounded,color:AppColors.primary)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('آخر النشاطات',style:TextStyle(fontSize:22,fontWeight:FontWeight.w800)),Text(unread>0?'لديك $unread تنبيه غير مقروء':'أنت على اطلاع بكل التنبيهات',style:const TextStyle(color:Colors.grey))]))]));
- List<NotificationModel> _filtered(List<NotificationModel>s){if(_filter==0)return s;final t=switch(_filter){1=>NotificationType.like,2=>NotificationType.comment,_=>NotificationType.follow};return s.where((n)=>n.type==t).toList();}
- Widget _empty()=>Center(child:Padding(padding:const EdgeInsets.all(30),child:Column(mainAxisSize:MainAxisSize.min,children:[Icon(Icons.notifications_none_rounded,size:82,color:Colors.grey.shade400),const SizedBox(height:14),const Text('لا توجد تنبيهات',style:TextStyle(fontSize:21,fontWeight:FontWeight.w800)),const SizedBox(height:8),const Text('ستظهر الإعجابات والتعليقات والمتابعات الجديدة هنا.',textAlign:TextAlign.center,style:TextStyle(color:Colors.grey))])));
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('التنبيهات')),
+      body: Consumer<NotificationProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading) return const Center(child: CircularProgressIndicator());
+          final notifications = provider.notifications;
+          if (notifications.isEmpty) return const Center(child: Text('لا توجد تنبيهات'));
+          return RefreshIndicator(
+            onRefresh: provider.loadNotifications,
+            child: ListView.builder(
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final item = notifications[index];
+                return ListTile(
+                  leading: CircleAvatar(child: Icon(_icon(item.type))),
+                  title: Text(item.user?.username ?? 'مستخدم'),
+                  subtitle: Text(item.message),
+                  trailing: item.isRead ? null : const CircleAvatar(radius: 4),
+                  onTap: () => provider.markAsRead(item.id),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  IconData _icon(NotificationType type) {
+    switch (type) {
+      case NotificationType.like: return Icons.favorite_rounded;
+      case NotificationType.comment: return Icons.chat_bubble_rounded;
+      case NotificationType.follow: return Icons.person_add_alt_1_rounded;
+      case NotificationType.mention: return Icons.alternate_email_rounded;
+      case NotificationType.share: return Icons.share_rounded;
+      case NotificationType.live: return Icons.videocam_rounded;
+      case NotificationType.gift: return Icons.card_giftcard_rounded;
+      case NotificationType.system: return Icons.info_outline_rounded;
+    }
+  }
 }
-class _NotificationTile extends StatelessWidget{final NotificationModel notification;const _NotificationTile({required this.notification});@override Widget build(BuildContext context)=>Dismissible(key:ValueKey(notification.id),direction:DismissDirection.endToStart,background:Container(color:Colors.red,alignment:Alignment.centerRight,padding:const EdgeInsets.only(right:20),child:const Icon(Icons.delete_outline,color:Colors.white)),onDismissed:(_)=>context.read<NotificationProvider>().deleteNotification(notification.id),child:Material(color:notification.isRead?Colors.transparent:AppColors.primary.withValues(alpha:.055),child:InkWell(onTap:()=>context.read<NotificationProvider>().markAsRead(notification.id),child:Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:12),child:Row(crossAxisAlignment:CrossAxisAlignment.start,children:[CircleAvatar(radius:25,backgroundColor:AppColors.primary.withValues(alpha:.1),child:Icon(_icon(notification.type),color:AppColors.primary)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${notification.user?.username??'مستخدم'} ${notification.type.displayName}',style:const TextStyle(fontWeight:FontWeight.w800)),const SizedBox(height:4),Text(notification.message,maxLines:2,overflow:TextOverflow.ellipsis),const SizedBox(height:5),Text(_time(notification.createdAt),style:const TextStyle(color:Colors.grey,fontSize:11))])),if(!notification.isRead)const Padding(padding:EdgeInsets.only(top:7),child:CircleAvatar(radius:4,backgroundColor:AppColors.primary))]))));
- IconData _icon(NotificationType t)=>switch(t){NotificationType.like=>Icons.favorite_rounded,NotificationType.comment=>Icons.chat_bubble_rounded,NotificationType.follow=>Icons.person_add_alt_1_rounded,NotificationType.mention=>Icons.alternate_email_rounded,NotificationType.share=>Icons.share_rounded,NotificationType.live=>Icons.videocam_rounded,NotificationType.gift=>Icons.card_giftcard_rounded,NotificationType.system=>Icons.info_outline_rounded};
- String _time(DateTime d){final x=DateTime.now().difference(d);if(x.inMinutes<1)return'الآن';if(x.inMinutes<60)return'منذ ${x.inMinutes} دقيقة';if(x.inHours<24)return'منذ ${x.inHours} ساعة';if(x.inDays<7)return'منذ ${x.inDays} يوم';return'${d.day}/${d.month}/${d.year}';}
-}
-class _NotificationShimmer extends StatelessWidget{const _NotificationShimmer();@override Widget build(BuildContext context)=>Shimmer.fromColors(baseColor:Colors.black12,highlightColor:Colors.white70,child:ListView.builder(itemCount:7,itemBuilder:(_,__)=>const Padding(padding:EdgeInsets.symmetric(horizontal:16,vertical:12),child:Row(children:[CircleAvatar(radius:25,backgroundColor:Colors.white),SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[SizedBox(height:13,width:190),SizedBox(height:8),SizedBox(height:11,width:240),SizedBox(height:7),SizedBox(height:9,width:70)]))]))));}
