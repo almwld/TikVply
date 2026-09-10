@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/feed_provider.dart';
@@ -20,6 +21,18 @@ class _MainScreenState extends State<MainScreen> {
   final PageController _pageController = PageController();
 
   @override
+  void initState() {
+    super.initState();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
+  }
+
+  @override
   void dispose() { _pageController.dispose(); super.dispose(); }
 
   void _onTabTapped(int index) {
@@ -34,16 +47,25 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (i) => setState(() => _currentIndex = i),
-          children: const [FeedScreen(), SearchScreen(), SizedBox.shrink(), NotificationsScreen(), ProfileScreen()],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            children: const [FeedScreen(), SearchScreen(), SizedBox.shrink(), NotificationsScreen(), ProfileScreen()],
+          ),
+          bottomNavigationBar: _buildBottomNavBar(),
         ),
-        bottomNavigationBar: _buildBottomNavBar(),
       ),
     );
   }
@@ -94,7 +116,7 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Consumer<VideoProvider>(builder: (context, videos, _) {
       if (videos.isLoading && videos.videos.isEmpty) return const ColoredBox(color: Colors.black, child: Center(child: CircularProgressIndicator()));
-      return Scaffold(backgroundColor: Colors.black, body: Stack(children: [
+      return ColoredBox(color: Colors.black, child: Stack(fit: StackFit.expand, children: [
         if (videos.videos.isEmpty) _emptyState(context, videos) else PageView.builder(controller: _controller, scrollDirection: Axis.vertical, physics: const BouncingScrollPhysics(parent: PageScrollPhysics()), itemCount: videos.videos.length, onPageChanged: videos.setCurrentIndex, itemBuilder: (_, i) => VideoPage(key: ValueKey(videos.videos[i].id), video: videos.videos[i])),
         Positioned(top: 0, left: 0, right: 0, child: SafeArea(child: _topBar(context, videos))),
       ]));
