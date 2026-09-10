@@ -77,6 +77,19 @@ jobs:
           grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
       - name: Install TikVply dependencies
         run: flutter pub get
+      - name: Patch legacy video_thumbnail Android build
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          candidates = list(Path('${PUB_CACHE:-/home/runner/.pub-cache}').glob('hosted/pub.dev/video_thumbnail-*/android/build.gradle'))
+          if not candidates:
+              raise SystemExit('video_thumbnail Android build.gradle not found')
+          for gradle in candidates:
+              text = gradle.read_text()
+              text = text.replace('jcenter()', 'mavenCentral()')
+              gradle.write_text(text)
+              print(f'Patched {gradle}')
+          PY
       - name: Remove generated Flutter smoke test
         run: rm -f test/widget_test.dart
       - name: Static analysis
