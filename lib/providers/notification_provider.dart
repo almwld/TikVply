@@ -2,53 +2,34 @@ import 'package:flutter/material.dart';
 import '../models/notification/notification_model.dart';
 
 class NotificationProvider extends ChangeNotifier {
-  List<NotificationModel> _notifications = [];
+  List<NotificationModel> _notifications = <NotificationModel>[];
   bool _isLoading = false;
   int _unreadCount = 0;
 
-  List<NotificationModel> get notifications => _notifications;
+  List<NotificationModel> get notifications => List.unmodifiable(_notifications);
   bool get isLoading => _isLoading;
   int get unreadCount => _unreadCount;
-
-  NotificationProvider() {
-    _loadMockNotifications();
-  }
-
-  void _loadMockNotifications() {
-    _notifications = List.generate(20, (index) {
-      return NotificationModel(
-        id: 'notif_$index',
-        oderId: 'user_00$index',
-        type: NotificationType.values[index % NotificationType.values.length],
-        videoId: 'video_$index',
-        message: 'Someone interacted with your video',
-        isRead: index > 5,
-        createdAt: DateTime.now().subtract(Duration(hours: index)),
-      );
-    });
-    _unreadCount = _notifications.where((n) => !n.isRead).length;
-  }
 
   Future<void> loadNotifications() async {
     _isLoading = true;
     notifyListeners();
-
-    await Future.delayed(const Duration(seconds: 1));
-
-    _isLoading = false;
-    notifyListeners();
+    try {
+      // The repository currently has no notification API/data source.
+      // Keep the state empty instead of displaying fabricated notifications.
+      _notifications = <NotificationModel>[];
+      _unreadCount = 0;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> markAsRead(String notificationId) async {
     final index = _notifications.indexWhere((n) => n.id == notificationId);
-    if (index != -1) {
-      final notification = _notifications[index];
-      if (!notification.isRead) {
-        _notifications[index] = notification.copyWith(isRead: true);
-        _unreadCount = _notifications.where((n) => !n.isRead).length;
-        notifyListeners();
-      }
-    }
+    if (index == -1 || _notifications[index].isRead) return;
+    _notifications[index] = _notifications[index].copyWith(isRead: true);
+    _unreadCount = _notifications.where((n) => !n.isRead).length;
+    notifyListeners();
   }
 
   Future<void> markAllAsRead() async {
