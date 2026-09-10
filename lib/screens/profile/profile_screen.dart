@@ -20,10 +20,10 @@ class ProfileScreen extends StatelessWidget {
         final user = auth.currentUser;
         return Column(children: [
           const SizedBox(height: 20),
-          CircleAvatar(radius: 45, child: user == null ? const Icon(Icons.person, size: 42) : Text((user.username ?? 'T').substring(0, 1).toUpperCase())),
+          CircleAvatar(radius: 45, child: user == null ? const Icon(Icons.person, size: 42) : Text(user.username.substring(0, 1).toUpperCase())),
           const SizedBox(height: 8),
           Text(user?.fullName ?? 'مستخدم TikVply', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          if (user?.username != null) Text('@${user!.username}', style: const TextStyle(color: Colors.grey)),
+          if (user != null) Text('@${user.username}', style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 12),
           Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [Text('المتابعون ${auth.userStats.followersCount}'), Text('أتابع ${auth.userStats.followingCount}'), Text('الإعجابات ${auth.userStats.likesCount}')]),
           Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())), icon: const Icon(Icons.edit), label: const Text('تعديل الملف')))])),
