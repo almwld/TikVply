@@ -130,9 +130,15 @@ class VideoProvider extends ChangeNotifier {
       return haystack.contains(query);
     }).toList();
     switch (_sort) {
-      case VideoSort.newest: filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      case VideoSort.oldest: filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      case VideoSort.duration: filtered.sort((a, b) => a.duration.compareTo(b.duration));
+      case VideoSort.newest:
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case VideoSort.oldest:
+        filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        break;
+      case VideoSort.duration:
+        filtered.sort((a, b) => a.duration.compareTo(b.duration));
+        break;
     }
     _videos = filtered; if (_videos.isEmpty) _currentIndex = 0; if (notify) notifyListeners();
   }
