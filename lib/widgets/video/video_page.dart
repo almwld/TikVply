@@ -1,29 +1,37 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:video_player/video_player.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
+import '../../services/video_playback_state_service.dart';
 import 'video_actions.dart';
 import 'video_info.dart';
 
 class VideoPage extends StatefulWidget {
   final VideoModel video;
   const VideoPage({super.key, required this.video});
+
   @override
   State<VideoPage> createState() => _VideoPageState();
 }
 
-class _VideoPageState extends State<VideoPage> {
+class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   VideoPlayerController? _controller;
+  final VideoPlaybackStateService _playbackState = VideoPlaybackStateService();
+  Timer? _saveTimer;
   bool _loading = true;
   String? _error;
   bool _showControls = true;
   bool _showLikeAnimation = false;
+  bool _fullscreen = false;
   Offset _likePosition = Offset.zero;
 
   VideoSettingsProvider get _settings => context.read<VideoSettingsProvider>();
@@ -32,6 +40,14 @@ class _VideoPageState extends State<VideoPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
     _settings.addListener(_applySettings);
     _initializeVideo();
   }
@@ -39,7 +55,11 @@ class _VideoPageState extends State<VideoPage> {
   Future<void> _initializeVideo() async {
     final previous = _controller;
     _controller = null;
-    if (previous != null) await previous.dispose();
+    _saveTimer?.cancel();
+    if (previous != null) {
+      previous.removeListener(_playerListener);
+      await previous.dispose();
+    }
     if (mounted) setState(() { _loading = true; _error = null; });
 
     try {
@@ -49,31 +69,85 @@ class _VideoPageState extends State<VideoPage> {
       _controller = source;
       source.addListener(_playerListener);
       await source.initialize();
+
+      final value = source.value;
+      if (!value.isInitialized || value.duration <= Duration.zero) {
+        throw StateError('Video stream has no valid video duration');
+      }
+      if (value.size.width <= 0 || value.size.height <= 0) {
+        throw StateError('Video decoder returned an invalid video surface');
+      }
+
       await _applySettings();
+      final saved = await _playbackState.loadPosition(widget.video.id);
+      if (saved != null && saved < source.value.duration - const Duration(seconds: 2)) {
+        await source.seekTo(saved);
+      }
+
       if (!mounted) return;
       setState(() => _loading = false);
       if (_settings.autoplay) await source.play();
+      _startPositionPersistence();
+      await context.read<VideoProvider>().updateVideoMetadata(
+        widget.video.id,
+        duration: source.value.duration,
+        aspectRatio: source.value.aspectRatio,
+      );
       await context.read<VideoProvider>().incrementViews(widget.video.id);
     } catch (error, stackTrace) {
-      debugPrint('TikVply stable video_player error: $error');
+      debugPrint('TikVply video initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
-      if (mounted) setState(() { _loading = false; _error = _errorText(error); });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = _errorText(error);
+        });
+      }
     }
   }
 
   String _errorText(Object error) {
     final text = error.toString().toLowerCase();
-    if (text.contains('permission') || text.contains('access')) return 'لا يمكن الوصول إلى ملف الفيديو. تحقق من إذن الوسائط.';
-    if (text.contains('source') || text.contains('format') || text.contains('codec')) return 'صيغة الفيديو غير مدعومة على هذا الجهاز.';
-    return 'تعذر تشغيل الفيديو. اضغط إعادة المحاولة.';
+    if (text.contains('permission') || text.contains('access')) {
+      return 'لا يمكن الوصول إلى ملف الفيديو. تحقق من إذن الوسائط.';
+    }
+    if (text.contains('codec') || text.contains('decoder') || text.contains('format') || text.contains('surface') || text.contains('unsupported')) {
+      return 'تعذر فك ترميز صورة الفيديو على هذا الجهاز. قد يكون ترميز الفيديو غير مدعوم.';
+    }
+    return 'تعذر تشغيل الفيديو. يمكنك إعادة المحاولة أو الانتقال للفيديو التالي.';
   }
 
   void _playerListener() {
     final c = _controller;
     if (c == null || !mounted || !c.value.isInitialized) return;
     if (c.value.hasError && _error == null) {
-      setState(() { _loading = false; _error = c.value.errorDescription ?? 'تعذر تشغيل الفيديو'; });
+      setState(() {
+        _loading = false;
+        _error = c.value.errorDescription ?? 'تعذر تشغيل الفيديو';
+      });
     }
+    if (c.value.position >= c.value.duration && c.value.duration > Duration.zero && !_settings.loop) {
+      _savePlaybackPosition(Duration.zero);
+    }
+  }
+
+  void _startPositionPersistence() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      final c = _controller;
+      if (c != null && c.value.isInitialized && c.value.isPlaying) {
+        _savePlaybackPosition(c.value.position);
+      }
+    });
+  }
+
+  Future<void> _savePlaybackPosition(Duration position) async {
+    try {
+      if (position <= Duration.zero || position >= (_controller?.value.duration ?? Duration.zero)) {
+        return;
+      }
+      await _playbackState.savePosition(widget.video.id, position);
+    } catch (_) {}
   }
 
   Future<void> _applySettings() async {
@@ -83,13 +157,26 @@ class _VideoPageState extends State<VideoPage> {
       await c.setLooping(_settings.loop);
       await c.setVolume(_settings.muted ? 0 : 1);
       await c.setPlaybackSpeed(_settings.playbackSpeed);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('TikVply video settings failed: $error');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final c = _controller;
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (c != null && c.value.isInitialized) {
+        _savePlaybackPosition(c.value.position);
+        c.pause();
+      }
+    }
   }
 
   void _togglePlay() {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    setState(() => _showControls = !_showControls);
+    setState(() => _showControls = true);
     c.value.isPlaying ? c.pause() : c.play();
   }
 
@@ -97,7 +184,9 @@ class _VideoPageState extends State<VideoPage> {
     final provider = context.read<VideoProvider>();
     if (!widget.video.isLiked) provider.likeVideo(widget.video.id);
     setState(() { _showLikeAnimation = true; _likePosition = details.localPosition; });
-    Future.delayed(const Duration(milliseconds: 650), () { if (mounted) setState(() => _showLikeAnimation = false); });
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (mounted) setState(() => _showLikeAnimation = false);
+    });
   }
 
   void _seekBy(int seconds) {
@@ -108,25 +197,59 @@ class _VideoPageState extends State<VideoPage> {
     c.seekTo(target < Duration.zero ? Duration.zero : target > duration ? duration : target);
   }
 
+  Future<void> _toggleFullscreen() async {
+    _fullscreen = !_fullscreen;
+    if (_fullscreen) {
+      await SystemChrome.setPreferredOrientations(const [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
-    _settings.removeListener(_applySettings);
+    _saveTimer?.cancel();
     final c = _controller;
+    if (c != null && c.value.isInitialized) _savePlaybackPosition(c.value.position);
+    _settings.removeListener(_applySettings);
+    WidgetsBinding.instance.removeObserver(this);
     if (c != null) c.removeListener(_playerListener);
     c?.dispose();
+    if (_fullscreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+    }
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ));
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Colors.black,
-    child: Stack(fit: StackFit.expand, children: [
-      if (_loading) const _VideoLoadingShimmer()
-      else if (_error != null) _errorView()
-      else _playerView(),
-      if (!_loading && _error == null) _overlay(),
-      if (_showLikeAnimation) _likeAnimation(),
-    ]),
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    value: const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+    child: Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(fit: StackFit.expand, children: [
+        if (_loading) const _VideoLoadingShimmer()
+        else if (_error != null) _errorView()
+        else _playerView(),
+        if (!_loading && _error == null) _overlay(),
+        if (_showLikeAnimation) _likeAnimation(),
+      ]),
+    ),
   );
 
   Widget _playerView() {
@@ -150,7 +273,17 @@ class _VideoPageState extends State<VideoPage> {
               VideoFitMode.contain => BoxFit.contain,
               VideoFitMode.fill => BoxFit.fill,
             };
-            return SizedBox.expand(child: FittedBox(fit: fit, clipBehavior: Clip.hardEdge, child: AspectRatio(aspectRatio: aspect, child: VideoPlayer(c))));
+            return SizedBox.expand(
+              child: FittedBox(
+                fit: fit,
+                clipBehavior: Clip.hardEdge,
+                child: SizedBox(
+                  width: value.size.width,
+                  height: value.size.width / aspect,
+                  child: VideoPlayer(c),
+                ),
+              ),
+            );
           },
         ),
       ),
@@ -159,12 +292,13 @@ class _VideoPageState extends State<VideoPage> {
 
   Widget _overlay() => Stack(children: [
     const Positioned(top: 0, left: 0, right: 0, child: IgnorePointer(child: _TopGradient())),
+    Positioned(top: MediaQuery.paddingOf(context).top + 4, right: 8, child: IconButton(onPressed: _toggleFullscreen, icon: Icon(_fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: Colors.white))),
     Positioned(left: 12, right: 78, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
     Positioned(right: 10, bottom: 92, child: VideoActions(video: widget.video)),
-    Positioned(left: 12, right: 12, bottom: 12, child: ValueListenableBuilder<VideoPlayerValue>(valueListenable: _controller!, builder: (_, value, __) {
+    Positioned(left: 12, right: 12, bottom: MediaQuery.paddingOf(context).bottom + 12, child: ValueListenableBuilder<VideoPlayerValue>(valueListenable: _controller!, builder: (_, value, __) {
       if (!value.isInitialized || !_showControls) return const SizedBox.shrink();
       return Row(children: [
-        IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: () => value.isPlaying ? _controller!.pause() : _controller!.play()),
+        IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
         IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seekBy(-10)),
         Expanded(child: VideoProgressIndicator(_controller!, allowScrubbing: true, padding: const EdgeInsets.symmetric(horizontal: 4), colors: const VideoProgressColors(playedColor: AppColors.primary, bufferedColor: Colors.white38, backgroundColor: Colors.white24))),
         IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seekBy(10)),
@@ -177,8 +311,11 @@ class _VideoPageState extends State<VideoPage> {
     const SizedBox(height: 14),
     Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
     const SizedBox(height: 18),
-    FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
-  ])));
+    Wrap(alignment: WrapAlignment.center, spacing: 10, children: [
+      FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+      OutlinedButton.icon(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.skip_next_rounded), label: const Text('تجاوز')),
+    ]),
+  ]));
 
   Widget _likeAnimation() => Positioned(left: _likePosition.dx - 50, top: _likePosition.dy - 50, child: TweenAnimationBuilder<double>(tween: Tween(begin: .35, end: 1.15), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, scale, child) => Transform.scale(scale: scale, child: child), child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100)));
 }
