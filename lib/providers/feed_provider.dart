@@ -11,6 +11,7 @@ class VideoProvider extends ChangeNotifier {
   final LocalVideoService _localVideoService = LocalVideoService();
   final DeviceMediaService _deviceMediaService = DeviceMediaService();
   final LocalVideoInteractionService _interactionService = LocalVideoInteractionService();
+  List<VideoModel> _allVideos = [];
   List<VideoModel> _videos = [];
   int _currentIndex = 0;
   bool _isLoading = false;
@@ -20,6 +21,7 @@ class VideoProvider extends ChangeNotifier {
   VideoSort _sort = VideoSort.newest;
 
   List<VideoModel> get videos => List.unmodifiable(_videos);
+  int get totalVideos => _allVideos.length;
   int get currentIndex => _currentIndex;
   bool get isLoading => _isLoading;
   bool get isRefreshing => _isRefreshing;
@@ -91,7 +93,6 @@ class VideoProvider extends ChangeNotifier {
         videoUrl: path,
         caption: path.split(RegExp(r'[/\\]')).last,
         likesCount: _int(state['likesCount']),
-        commentsCount: 0,
         sharesCount: _int(state['sharesCount']),
         viewsCount: _int(state['viewsCount']),
         savesCount: _int(state['savesCount']),
@@ -104,7 +105,7 @@ class VideoProvider extends ChangeNotifier {
         createdAt: DateTime.now().subtract(Duration(minutes: entry.key)),
       ));
     }
-    _videos = loaded;
+    _allVideos = loaded;
     _applyFilterAndSort(notify: false);
     if (_videos.isEmpty) {
       _currentIndex = 0;
@@ -116,12 +117,13 @@ class VideoProvider extends ChangeNotifier {
   static int _int(dynamic value) => value is num ? value.toInt() : 0;
 
   Future<void> removeVideo(String videoId) async {
-    final index = _videos.indexWhere((video) => video.id == videoId);
+    final index = _allVideos.indexWhere((video) => video.id == videoId);
     if (index == -1) return;
-    final path = _videos[index].videoUrl;
+    final path = _allVideos[index].videoUrl;
     await _localVideoService.removePath(path);
     await _interactionService.remove(videoId);
-    _videos.removeAt(index);
+    _allVideos.removeAt(index);
+    _applyFilterAndSort(notify: false);
     if (_currentIndex >= _videos.length && _videos.isNotEmpty) _currentIndex = _videos.length - 1;
     if (_videos.isEmpty) _currentIndex = 0;
     notifyListeners();
@@ -155,22 +157,20 @@ class VideoProvider extends ChangeNotifier {
 
   void _applyFilterAndSort({bool notify = true}) {
     final query = _query.toLowerCase();
-    final filtered = _videos.where((video) {
+    final filtered = _allVideos.where((video) {
       if (query.isEmpty) return true;
       final haystack = '${video.caption ?? ''} ${video.user?.username ?? ''} ${video.hashtags.join(' ')}'.toLowerCase();
       return haystack.contains(query);
-    }).toList(growable: false);
-    final sorted = [...filtered];
+    }).toList();
     switch (_sort) {
       case VideoSort.newest:
-        sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       case VideoSort.oldest:
-        sorted.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       case VideoSort.duration:
-        sorted.sort((a, b) => a.duration.compareTo(b.duration));
+        filtered.sort((a, b) => a.duration.compareTo(b.duration));
     }
-    // Keep the canonical list filtered for the current browsing session.
-    _videos = sorted;
+    _videos = filtered;
     if (_videos.isEmpty) _currentIndex = 0;
     if (notify) notifyListeners();
   }
@@ -196,10 +196,11 @@ class VideoProvider extends ChangeNotifier {
   Future<void> followUserForVideo(String videoId) async => _updateVideo(videoId, (v) => v.copyWith(isFollowing: !v.isFollowing));
 
   Future<void> _updateVideo(String id, VideoModel Function(VideoModel) update) async {
-    final index = _videos.indexWhere((video) => video.id == id);
+    final index = _allVideos.indexWhere((video) => video.id == id);
     if (index == -1) return;
-    final updated = update(_videos[index]);
-    _videos[index] = updated;
+    final updated = update(_allVideos[index]);
+    _allVideos[index] = updated;
+    _applyFilterAndSort(notify: false);
     await _interactionService.update(id, {
       'likesCount': updated.likesCount,
       'savesCount': updated.savesCount,
