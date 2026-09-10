@@ -53,11 +53,15 @@ jobs:
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           text = manifest.read_text()
-          text = text.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />', 1)
+          permissions = '''    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n'''
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          if marker not in text:
+              raise SystemExit('Could not locate Android manifest root')
+          text = text.replace(marker, marker + '\n' + permissions, 1)
           text = text.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"', 1)
           text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"', 1)
           marker = '    </activity>'
-          intent_block = '\n        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n        <intent-filter>\n            <action android:name="android.intent.action.SEND" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n'
+          intent_block = '''\n        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n        <intent-filter>\n            <action android:name="android.intent.action.SEND" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n'''
           if marker not in text:
               raise SystemExit('Could not locate MainActivity closing tag')
           text = text.replace(marker, intent_block + marker, 1)
@@ -74,21 +78,26 @@ jobs:
             <path android:fillColor="#0A8F83" android:pathData="M155,149 A9,9 0,1 0,173 149 A9,9 0,1 0,155 149"/>
           </vector>
           XML
-          grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
+          grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|READ_MEDIA\|READ_EXTERNAL\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
       - name: Install TikVply dependencies
         run: flutter pub get
       - name: Patch legacy video_thumbnail Android build
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          candidates = list(Path('${PUB_CACHE:-/home/runner/.pub-cache}').glob('hosted/pub.dev/video_thumbnail-*/android/build.gradle'))
+          cache = Path.home() / '.pub-cache'
+          candidates = list(cache.glob('hosted/pub.dev/video_thumbnail-*/android/build.gradle'))
           if not candidates:
-              raise SystemExit('video_thumbnail Android build.gradle not found')
-          for gradle in candidates:
-              text = gradle.read_text()
-              text = text.replace('jcenter()', 'mavenCentral()')
-              gradle.write_text(text)
-              print(f'Patched {gradle}')
+              print('video_thumbnail Android build.gradle not found; skipping legacy patch')
+          else:
+              for gradle in candidates:
+                  text = gradle.read_text()
+                  patched = text.replace('jcenter()', 'mavenCentral()')
+                  if patched != text:
+                      gradle.write_text(patched)
+                      print(f'Patched {gradle}')
+                  else:
+                      print(f'No legacy jcenter() found in {gradle}')
           PY
       - name: Remove generated Flutter smoke test
         run: rm -f test/widget_test.dart
