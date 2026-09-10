@@ -85,6 +85,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           cache = Path.home() / '.pub-cache'
           candidates = list(cache.glob('hosted/pub.dev/video_thumbnail-*/android/build.gradle'))
           if not candidates:
@@ -92,12 +93,11 @@ jobs:
           else:
               for gradle in candidates:
                   text = gradle.read_text()
-                  patched = text.replace('jcenter()', 'mavenCentral()')
-                  if patched != text:
-                      gradle.write_text(patched)
-                      print(f'Patched {gradle}')
-                  else:
-                      print(f'No legacy jcenter() found in {gradle}')
+                  text = text.replace('jcenter()', 'mavenCentral()')
+                  text = re.sub(r'compileSdkVersion\s+33\b', 'compileSdkVersion 36', text)
+                  text = re.sub(r'compileSdk\s*=\s*33\b', 'compileSdk = 36', text)
+                  gradle.write_text(text)
+                  print(f'Patched legacy Android configuration in {gradle}')
           PY
       - name: Remove generated Flutter smoke test
         run: rm -f test/widget_test.dart
