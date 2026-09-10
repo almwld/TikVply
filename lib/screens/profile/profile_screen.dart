@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
 import '../../models/user/user_model.dart';
-import 'edit_profile_screen.dart';
+import '../../services/video_thumbnail_service.dart';
 import '../settings/settings_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,28 +24,37 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) => Scaffold(body: Consumer<AuthProvider>(builder: (context, auth, _) {
     final user = auth.currentUser; final stats = auth.userStats;
-    return CustomScrollView(slivers: [
-      SliverAppBar(pinned: true, expandedHeight: 290, title: Text(user == null ? 'الملف الشخصي' : '@${user.username}'), actions: [IconButton(icon: const Icon(Icons.share_outlined), onPressed: () => Share.share('@${user?.username ?? 'TikVply'} على TikVply')), IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())))], flexibleSpace: FlexibleSpaceBar(background: _header(user, stats))),
-      SliverPersistentHeader(pinned: true, delegate: _TabDelegate(TabBar(controller: _tabs, tabs: const [Tab(icon: Icon(Icons.grid_on)), Tab(icon: Icon(Icons.bookmark_outline)), Tab(icon: Icon(Icons.favorite_border))]))),
-      SliverFillRemaining(child: TabBarView(controller: _tabs, children: [_videos(), _emptyTab(Icons.bookmark_border, 'الفيديوهات المحفوظة'), _emptyTab(Icons.favorite_border, 'الفيديوهات التي أعجبتك')])),
-    ]);
+    return NestedScrollView(headerSliverBuilder: (_, __) => [
+      SliverAppBar(pinned: true, expandedHeight: 300, title: Text(user == null ? 'الملف الشخصي' : '@${user.username}'), actions: [IconButton(tooltip: 'مشاركة', icon: const Icon(Icons.share_outlined), onPressed: () => Share.share('@${user?.username ?? 'TikVply'} على TikVply')), IconButton(tooltip: 'الإعدادات', icon: const Icon(Icons.settings_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())))], flexibleSpace: FlexibleSpaceBar(background: _header(user, stats))),
+      SliverPersistentHeader(pinned: true, delegate: _TabDelegate(TabBar(controller: _tabs, tabs: const [Tab(icon: Icon(Icons.grid_on_rounded)), Tab(icon: Icon(Icons.bookmark_outline_rounded)), Tab(icon: Icon(Icons.favorite_border_rounded))]))),
+    ], body: TabBarView(controller: _tabs, children: [_videoGrid((v) => true), _videoGrid((v) => v.isSaved), _videoGrid((v) => v.isLiked)]));
   }));
 
-  Widget _header(UserModel? user, dynamic stats) => Container(padding: const EdgeInsets.only(top: 75), child: Column(children: [
-    CircleAvatar(radius: 48, backgroundColor: AppColors.primary, backgroundImage: user?.avatarUrl == null ? null : NetworkImage(user!.avatarUrl!), child: user?.avatarUrl == null ? const Icon(Icons.person, color: Colors.white, size: 44) : null),
-    const SizedBox(height: 10), Text(user?.fullName ?? 'مستخدم TikVply', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-    if (user?.bio != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 5), child: Text(user!.bio!, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
-    const SizedBox(height: 8), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_stat('المتابَعون', 'followersCount', stats), _stat('أتابع', 'followingCount', stats), _stat('الإعجابات', 'likesCount', stats)]),
-    const SizedBox(height: 12), Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())), icon: const Icon(Icons.edit_outlined), label: const Text('تعديل الملف'))), const SizedBox(width: 10), OutlinedButton(onPressed: () => _showAccountMenu(context), child: const Icon(Icons.more_horiz))])),
+  Widget _header(UserModel? user, dynamic stats) => Container(padding: const EdgeInsets.only(top: 76, left: 18, right: 18), child: Column(children: [
+    CircleAvatar(radius: 45, backgroundColor: AppColors.primary, backgroundImage: user?.avatarUrl == null ? null : NetworkImage(user!.avatarUrl!), child: user?.avatarUrl == null ? const Icon(Icons.person_rounded, color: Colors.white, size: 42) : null),
+    const SizedBox(height: 9), Text(user?.fullName ?? 'مستخدم TikVply', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+    if (user?.username != null) Text('@${user!.username}', style: const TextStyle(color: Colors.grey)),
+    if (user?.bio != null && user!.bio!.trim().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: Text(user.bio!, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
+    const SizedBox(height: 10), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_Stat(value: '${stats.followersCount}', label: 'المتابعون'), _Stat(value: '${stats.followingCount}', label: 'أتابع'), _Stat(value: '${stats.likesCount}', label: 'الإعجابات')]),
+    const SizedBox(height: 11), Row(children: [Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())), icon: const Icon(Icons.edit_outlined), label: const Text('تعديل الملف'))), const SizedBox(width: 8), OutlinedButton(onPressed: () => _showMenu(context), child: const Icon(Icons.more_horiz_rounded))]),
   ]));
 
-  Widget _stat(String label, String key, dynamic s) { final v = key == 'followersCount' ? s.followersCount : key == 'followingCount' ? s.followingCount : s.likesCount; return InkWell(onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label: $v'))), child: Column(children: [Text('$v', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), Text(label, style: const TextStyle(fontSize: 12))])); }
+  Widget _videoGrid(bool Function(dynamic) filter) => Consumer<VideoProvider>(builder: (context, provider, _) {
+    final list = provider.videos.where(filter).toList();
+    if (list.isEmpty) return _empty();
+    return GridView.builder(padding: const EdgeInsets.all(3), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 3, mainAxisSpacing: 3, childAspectRatio: .68), itemCount: list.length, itemBuilder: (_, i) { final video = list[i]; return InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _ProfileVideoViewer(video: video))), child: Stack(fit: StackFit.expand, children: [_Thumb(path: video.videoUrl), const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black54]))), Positioned(right: 5, bottom: 5, child: Row(children: [const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14), const SizedBox(width: 2), Text(video.formatViews(), style: const TextStyle(color: Colors.white, fontSize: 10))]))])); });
+  });
 
-  Widget _videos() => Consumer<VideoProvider>(builder: (context, p, _) => GridView.builder(padding: const EdgeInsets.all(2), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2, childAspectRatio: 9 / 16), itemCount: p.videos.length, itemBuilder: (_, i) { final v = p.videos[i]; return InkWell(onTap: () { p.setCurrentIndex(i); Navigator.popUntil(context, (r) => r.isFirst); }, child: Stack(fit: StackFit.expand, children: [v.thumbnailUrl != null ? Image.network(v.thumbnailUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder()) : _placeholder(), Positioned(left: 5, bottom: 5, child: Row(children: [const Icon(Icons.play_arrow, color: Colors.white, size: 14), Text(v.formatViews(), style: const TextStyle(color: Colors.white, fontSize: 11))]))])); }));
-  Widget _placeholder() => Container(color: AppColors.primary.withValues(alpha: .25), child: const Icon(Icons.play_arrow, color: Colors.white, size: 36));
-  Widget _emptyTab(IconData icon, String text) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, size: 64, color: Colors.grey), const SizedBox(height: 12), Text(text, style: const TextStyle(color: Colors.grey, fontSize: 16))]));
-
-  void _showAccountMenu(BuildContext context) => showModalBottomSheet(context: context, builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [ListTile(leading: const Icon(Icons.settings_outlined), title: const Text('الإعدادات'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); }), ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('الخصوصية'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))), const Divider(), ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text('تسجيل الخروج', style: TextStyle(color: Colors.red)), onTap: () async { Navigator.pop(context); await context.read<AuthProvider>().logout(); if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst); })])));
+  Widget _empty() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.video_library_outlined, size: 68, color: Colors.grey.shade400), const SizedBox(height: 12), const Text('لا يوجد محتوى بعد', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))]));
+  Future<void> _showMenu(BuildContext context) async { showModalBottomSheet<void>(context: context, showDragHandle: true, builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [ListTile(leading: const Icon(Icons.settings_outlined), title: const Text('الإعدادات'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); }), ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: const Text('الخصوصية'), onTap: () { Navigator.pop(context); _info('الخصوصية', 'يمكنك التحكم في المظهر وإعدادات تشغيل الفيديو من الإعدادات.'); }), const Divider(), ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text('تسجيل الخروج', style: TextStyle(color: Colors.red)), onTap: () async { Navigator.pop(context); await context.read<AuthProvider>().logout(); })]))); }
+  void _info(String title, String body) => showDialog<void>(context: context, builder: (_) => AlertDialog(title: Text(title), content: Text(body), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسنًا'))]));
 }
+
+class _Stat extends StatelessWidget { final String value; final String label; const _Stat({required this.value, required this.label}); @override Widget build(BuildContext context) => Column(children: [Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)), const SizedBox(height: 2), Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey))]); }
+
+class _Thumb extends StatelessWidget { final String path; const _Thumb({required this.path}); @override Widget build(BuildContext context) { if (path.startsWith('http')) return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback()); return FutureBuilder<String?>(future: VideoThumbnailService.instance.getThumbnailPath(path), builder: (_, s) => s.hasData && s.data!.isNotEmpty ? Image.file(File(s.data!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback()) : _fallback()); } Widget _fallback() => const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 28))); }
+
+class _ProfileVideoViewer extends StatelessWidget { final dynamic video; const _ProfileVideoViewer({required this.video}); @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, body: SafeArea(child: VideoPlayerPageForProfile(video: video))); }
+class VideoPlayerPageForProfile extends StatelessWidget { final dynamic video; const VideoPlayerPageForProfile({required this.video}); @override Widget build(BuildContext context) { return const SizedBox.shrink(); } }
 
 class _TabDelegate extends SliverPersistentHeaderDelegate { final TabBar tabBar; _TabDelegate(this.tabBar); @override double get minExtent => tabBar.preferredSize.height; @override double get maxExtent => tabBar.preferredSize.height; @override Widget build(BuildContext c, double s, bool o) => Container(color: Theme.of(c).scaffoldBackgroundColor, child: tabBar); @override bool shouldRebuild(covariant _TabDelegate old) => false; }
