@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:av_player/av_player.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
+import '../../services/video_playback_state_service.dart';
 import 'video_actions.dart';
 import 'video_info.dart';
 
@@ -18,7 +20,10 @@ class VideoPage extends StatefulWidget {
 
 class _VideoPageState extends State<VideoPage> {
   late final AVPlayerController _controller;
+  final VideoPlaybackStateService _playbackState = VideoPlaybackStateService();
+  Timer? _saveTimer;
   bool _initialized = false;
+  bool _advanced = false;
 
   VideoSettingsProvider get _settings => context.read<VideoSettingsProvider>();
 
@@ -27,13 +32,12 @@ class _VideoPageState extends State<VideoPage> {
     super.initState();
     _settings.addListener(_applySettings);
     _controller = AVPlayerController(_sourceFor(widget.video.videoUrl));
+    _controller.addListener(_handlePlayerState);
     _initialize();
   }
 
   AVVideoSource _sourceFor(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return AVVideoSource.network(path);
-    }
+    if (path.startsWith('http://') || path.startsWith('https://')) return AVVideoSource.network(path);
     return AVVideoSource.file(path);
   }
 
@@ -41,11 +45,27 @@ class _VideoPageState extends State<VideoPage> {
     try {
       await _controller.initialize();
       await _applySettings();
+
+      final state = _controller.value;
+      await context.read<VideoProvider>().updateVideoMetadata(
+        widget.video.id,
+        duration: state.duration,
+        aspectRatio: state.aspectRatio,
+      );
+
       await _controller.setMediaMetadata(AVMediaMetadata(
         title: (widget.video.caption ?? '').trim().isEmpty ? 'TikVply' : widget.video.caption!,
         artist: 'TikVply',
         album: 'فيديوهات الهاتف',
       ));
+
+      final savedPosition = await _playbackState.loadPosition(widget.video.id);
+      if (savedPosition != null && savedPosition < state.duration) {
+        await _controller.seekTo(savedPosition);
+      } else if (savedPosition != null) {
+        await _playbackState.clearPosition(widget.video.id);
+      }
+
       if (_settings.autoplay) await _controller.play();
       if (!mounted) return;
       setState(() => _initialized = true);
@@ -55,6 +75,31 @@ class _VideoPageState extends State<VideoPage> {
       debugPrintStack(stackTrace: stackTrace);
       if (mounted) setState(() => _initialized = false);
     }
+  }
+
+  void _handlePlayerState() {
+    if (!_controller.value.isInitialized) return;
+    final state = _controller.value;
+    if (state.position > Duration.zero) {
+      _saveTimer ??= Timer.periodic(const Duration(seconds: 5), (_) => _savePosition());
+    }
+    if (state.isCompleted && !_settings.loop && !_advanced) {
+      _advanced = true;
+      unawaited(_savePosition(clear: true));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<VideoProvider>().nextVideo();
+      });
+    }
+  }
+
+  Future<void> _savePosition({bool clear = false}) async {
+    if (clear) {
+      await _playbackState.clearPosition(widget.video.id);
+      return;
+    }
+    if (!_controller.value.isInitialized || _controller.value.isCompleted) return;
+    await _playbackState.savePosition(widget.video.id, _controller.value.position);
   }
 
   Future<void> _applySettings() async {
@@ -68,7 +113,10 @@ class _VideoPageState extends State<VideoPage> {
 
   @override
   void dispose() {
+    unawaited(_savePosition());
+    _saveTimer?.cancel();
     _settings.removeListener(_applySettings);
+    _controller.removeListener(_handlePlayerState);
     _controller.dispose();
     super.dispose();
   }
@@ -97,7 +145,6 @@ class _VideoPageState extends State<VideoPage> {
       VideoFitMode.contain => BoxFit.contain,
       VideoFitMode.fill => BoxFit.fill,
     };
-
     return FittedBox(
       fit: fit,
       clipBehavior: Clip.hardEdge,
@@ -122,17 +169,8 @@ class _VideoPageState extends State<VideoPage> {
   Widget _buildOverlay() {
     return Stack(
       children: [
-        Positioned(
-          left: 12,
-          right: 82,
-          bottom: 108,
-          child: IgnorePointer(child: VideoInfo(video: widget.video)),
-        ),
-        Positioned(
-          right: 12,
-          bottom: 108,
-          child: VideoActions(video: widget.video),
-        ),
+        Positioned(left: 12, right: 82, bottom: 108, child: IgnorePointer(child: VideoInfo(video: widget.video))),
+        Positioned(right: 12, bottom: 108, child: VideoActions(video: widget.video)),
       ],
     );
   }
