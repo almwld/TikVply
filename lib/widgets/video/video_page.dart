@@ -45,27 +45,19 @@ class _VideoPageState extends State<VideoPage> {
     try {
       await _controller.initialize();
       await _applySettings();
-
       final state = _controller.value;
-      await context.read<VideoProvider>().updateVideoMetadata(
-        widget.video.id,
-        duration: state.duration,
-        aspectRatio: state.aspectRatio,
-      );
-
+      await context.read<VideoProvider>().updateVideoMetadata(widget.video.id, duration: state.duration, aspectRatio: state.aspectRatio);
       await _controller.setMediaMetadata(AVMediaMetadata(
         title: (widget.video.caption ?? '').trim().isEmpty ? 'TikVply' : widget.video.caption!,
         artist: 'TikVply',
         album: 'فيديوهات الهاتف',
       ));
-
       final savedPosition = await _playbackState.loadPosition(widget.video.id);
       if (savedPosition != null && savedPosition < state.duration) {
         await _controller.seekTo(savedPosition);
       } else if (savedPosition != null) {
         await _playbackState.clearPosition(widget.video.id);
       }
-
       if (_settings.autoplay) await _controller.play();
       if (!mounted) return;
       setState(() => _initialized = true);
@@ -123,9 +115,9 @@ class _VideoPageState extends State<VideoPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
         fit: StackFit.expand,
         children: [
           if (!_initialized)
