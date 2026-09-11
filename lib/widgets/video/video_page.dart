@@ -60,7 +60,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       previous.removeListener(_playerListener);
       await previous.dispose();
     }
-    if (mounted) setState(() { _loading = true; _error = null; });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final source = _isNetwork
@@ -183,7 +188,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void _onDoubleTap(TapDownDetails details) {
     final provider = context.read<VideoProvider>();
     if (!widget.video.isLiked) provider.likeVideo(widget.video.id);
-    setState(() { _showLikeAnimation = true; _likePosition = details.localPosition; });
+    setState(() {
+      _showLikeAnimation = true;
+      _likePosition = details.localPosition;
+    });
     Future.delayed(const Duration(milliseconds: 650), () {
       if (mounted) setState(() => _showLikeAnimation = false);
     });
@@ -232,25 +240,33 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   @override
-  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-    value: const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.black,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-    child: Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(fit: StackFit.expand, children: [
-        if (_loading) const _VideoLoadingShimmer()
-        else if (_error != null) _errorView()
-        else _playerView(),
-        if (!_loading && _error == null) _overlay(),
-        if (_showLikeAnimation) _likeAnimation(),
-      ]),
-    ),
-  );
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_loading)
+              const _VideoLoadingShimmer()
+            else if (_error != null)
+              _errorView()
+            else
+              _playerView(),
+            if (!_loading && _error == null) _overlay(),
+            if (_showLikeAnimation) _likeAnimation(),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _playerView() {
     final c = _controller!;
@@ -290,61 +306,243 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _overlay() => Stack(children: [
-    const Positioned(top: 0, left: 0, right: 0, child: IgnorePointer(child: _TopGradient())),
-    Positioned(top: MediaQuery.paddingOf(context).top + 4, right: 8, child: IconButton(onPressed: _toggleFullscreen, icon: Icon(_fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: Colors.white))),
-    Positioned(left: 12, right: 78, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
-    Positioned(right: 10, bottom: 92, child: VideoActions(video: widget.video)),
-    Positioned(left: 12, right: 12, bottom: MediaQuery.paddingOf(context).bottom + 12, child: ValueListenableBuilder<VideoPlayerValue>(valueListenable: _controller!, builder: (_, value, __) {
-      if (!value.isInitialized || !_showControls) return const SizedBox.shrink();
-      return Row(children: [
-        IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
-        IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seekBy(-10)),
-        Expanded(child: VideoProgressIndicator(_controller!, allowScrubbing: true, padding: const EdgeInsets.symmetric(horizontal: 4), colors: const VideoProgressColors(playedColor: AppColors.primary, bufferedColor: Colors.white38, backgroundColor: Colors.white24))),
-        IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seekBy(10)),
-      ]);
-    })),
-  ]);
+  Widget _overlay() {
+    return Stack(
+      children: [
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(child: _TopGradient()),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 4,
+          right: 8,
+          child: IconButton(
+            onPressed: _toggleFullscreen,
+            icon: Icon(
+              _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 78,
+          bottom: 92,
+          child: IgnorePointer(child: VideoInfo(video: widget.video)),
+        ),
+        Positioned(
+          right: 10,
+          bottom: 92,
+          child: VideoActions(video: widget.video),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: MediaQuery.paddingOf(context).bottom + 12,
+          child: ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: _controller!,
+            builder: (_, value, __) {
+              if (!value.isInitialized || !_showControls) return const SizedBox.shrink();
+              return Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: _togglePlay,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                    onPressed: () => _seekBy(-10),
+                  ),
+                  Expanded(
+                    child: VideoProgressIndicator(
+                      _controller!,
+                      allowScrubbing: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      colors: const VideoProgressColors(
+                        playedColor: AppColors.primary,
+                        bufferedColor: Colors.white38,
+                        backgroundColor: Colors.white24,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                    onPressed: () => _seekBy(10),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _errorView() => Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
-    const Icon(Icons.video_file_rounded, color: Colors.white54, size: 64),
-    const SizedBox(height: 14),
-    Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-    const SizedBox(height: 18),
-    Wrap(alignment: WrapAlignment.center, spacing: 10, children: [
-      FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
-      OutlinedButton.icon(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.skip_next_rounded), label: const Text('تجاوز')),
-    ]),
-  ])));
+  Widget _errorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.video_file_rounded, color: Colors.white54, size: 64),
+            const SizedBox(height: 14),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: _initializeVideo,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('إعادة المحاولة'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.skip_next_rounded),
+                  label: const Text('تجاوز'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _likeAnimation() => Positioned(left: _likePosition.dx - 50, top: _likePosition.dy - 50, child: TweenAnimationBuilder<double>(tween: Tween(begin: .35, end: 1.15), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, scale, child) => Transform.scale(scale: scale, child: child), child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100)));
+  Widget _likeAnimation() {
+    return Positioned(
+      left: _likePosition.dx - 50,
+      top: _likePosition.dy - 50,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: .35, end: 1.15),
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.elasticOut,
+        builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+        child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100),
+      ),
+    );
+  }
 }
 
 class _TopGradient extends StatelessWidget {
   const _TopGradient();
+
   @override
-  Widget build(BuildContext context) => Container(height: 120, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])));
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black54, Colors.transparent],
+        ),
+      ),
+    );
+  }
 }
 
 class _VideoLoadingShimmer extends StatelessWidget {
   const _VideoLoadingShimmer();
+
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(
-    baseColor: const Color(0xFF101817),
-    highlightColor: const Color(0xFF2B3836),
-    period: const Duration(milliseconds: 1150),
-    child: Stack(fit: StackFit.expand, children: [
-      const ColoredBox(color: Color(0xFF171F1E)),
-      Center(child: Container(width: 86, height: 86, decoration: const BoxDecoration(color: Color(0xFF26302F), shape: BoxShape.circle))),
-      Positioned(left: 16, right: 88, bottom: 104, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 205, height: 15, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))),
-        const SizedBox(height: 10),
-        Container(width: 145, height: 12, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))),
-        const SizedBox(height: 9),
-        Container(width: 230, height: 9, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(6))),
-      ])),
-      Positioned(right: 14, bottom: 128, child: Column(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsets.only(bottom: 15), child: Container(width: 45, height: 45, decoration: const BoxDecoration(color: Color(0xFF293331), shape: BoxShape.circle)))])),
-      const Positioned(left: 14, right: 14, bottom: 18, child: SizedBox(height: 4, child: ColoredBox(color: Color(0xFF293331)))),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFF101817),
+      highlightColor: const Color(0xFF2B3836),
+      period: const Duration(milliseconds: 1150),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Color(0xFF171F1E)),
+          Center(
+            child: Container(
+              width: 86,
+              height: 86,
+              decoration: const BoxDecoration(
+                color: Color(0xFF26302F),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 88,
+            bottom: 104,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 205,
+                  height: 15,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF293331),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 145,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF293331),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Container(
+                  width: 230,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF293331),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: 128,
+            child: Column(
+              children: [
+                for (var i = 0; i < 4; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 15),
+                    child: Container(
+                      width: 45,
+                      height: 45,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF293331),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Positioned(
+            left: 14,
+            right: 14,
+            bottom: 18,
+            child: SizedBox(
+              height: 4,
+              child: ColoredBox(color: Color(0xFF293331)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
