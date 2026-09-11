@@ -85,7 +85,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                     else
                       SliverPadding(
                         padding: const EdgeInsets.all(5),
-                        sliver: SliverGrid.builder(
+                        sliver: SliverGrid(
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
@@ -93,24 +93,26 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                             mainAxisSpacing: 4,
                             childAspectRatio: .68,
                           ),
-                          itemCount: videos.length,
-                          itemBuilder: (context, index) {
-                            final video = videos[index];
-                            return _MediaTile(
-                              video: video,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => _MediaViewer(
-                                      videos: videos,
-                                      initialIndex: index,
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final video = videos[index];
+                              return _MediaTile(
+                                video: video,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => _MediaViewer(
+                                        videos: videos,
+                                        initialIndex: index,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
+                                  );
+                                },
+                              );
+                            },
+                            childCount: videos.length,
+                          ),
                         ),
                       ),
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -159,7 +161,10 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          Text('$count فيديو', style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(
+            '$count فيديو',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
           const Spacer(),
           TextButton.icon(
             onPressed: _chooseSort,
@@ -236,10 +241,16 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.video_library_outlined, size: 76, color: Colors.grey),
+            const Icon(
+              Icons.video_library_outlined,
+              size: 76,
+              color: Colors.grey,
+            ),
             const SizedBox(height: 14),
             Text(
-              _query.isEmpty ? (provider.error ?? 'لا توجد فيديوهات') : 'لا توجد نتائج',
+              _query.isEmpty
+                  ? (provider.error ?? 'لا توجد فيديوهات')
+                  : 'لا توجد نتائج',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
