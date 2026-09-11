@@ -315,7 +315,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       FilledButton.icon(onPressed: _initializeVideo, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
       OutlinedButton.icon(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.skip_next_rounded), label: const Text('تجاوز')),
     ]),
-  ]));
+  ])));
 
   Widget _likeAnimation() => Positioned(left: _likePosition.dx - 50, top: _likePosition.dy - 50, child: TweenAnimationBuilder<double>(tween: Tween(begin: .35, end: 1.15), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, scale, child) => Transform.scale(scale: scale, child: child), child: const Icon(Icons.favorite_rounded, color: AppColors.secondary, size: 100)));
 }
