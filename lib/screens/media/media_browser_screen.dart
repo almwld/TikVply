@@ -10,7 +10,7 @@ import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
-import '../../widgets/video/video_page.dart';
+import '../../widgets/video/mx_video_page.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
   const MediaBrowserScreen({super.key});
@@ -82,7 +82,8 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
             return RefreshIndicator(
               onRefresh: () => _refreshIfNeeded(force: true),
               child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                cacheExtent: 700,
                 slivers: [
                   SliverToBoxAdapter(child: _searchField()),
                   SliverToBoxAdapter(child: _sortRow(videos.length)),
@@ -100,6 +101,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
                         ),
                         itemCount: videos.length,
                         itemBuilder: (_, index) => _MediaTile(
+                          key: ValueKey(videos[index].id),
                           video: videos[index],
                           onTap: () => Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => _MediaViewer(videos: videos, initialIndex: index),
@@ -194,7 +196,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
 class _MediaTile extends StatelessWidget {
   final VideoModel video;
   final VoidCallback onTap;
-  const _MediaTile({required this.video, required this.onTap});
+  const _MediaTile({super.key, required this.video, required this.onTap});
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
@@ -243,7 +245,9 @@ class _ThumbnailState extends State<_Thumbnail> with AutomaticKeepAliveClientMix
         }
         final source = snapshot.data;
         if (source != null && source.isNotEmpty) {
-          final image = source.startsWith('http') ? Image.network(source, fit: BoxFit.cover) : Image.file(File(source), fit: BoxFit.cover);
+          final image = source.startsWith('http')
+              ? Image.network(source, fit: BoxFit.cover, filterQuality: FilterQuality.low)
+              : Image.file(File(source), fit: BoxFit.cover, filterQuality: FilterQuality.low, cacheWidth: 360, cacheHeight: 540);
           return image;
         }
         return const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 28)));
@@ -292,13 +296,12 @@ class _MediaViewerState extends State<_MediaViewer> {
         scrollDirection: Axis.vertical,
         controller: _controller,
         itemCount: widget.videos.length,
-        itemBuilder: (_, index) => VideoPage(
+        itemBuilder: (_, index) => MxVideoPage(
           key: ValueKey(widget.videos[index].id),
           video: widget.videos[index],
           onCompleted: context.read<VideoSettingsProvider>().autoNext ? _next : null,
         ),
       ),
-      Positioned(top: MediaQuery.paddingOf(context).top + 4, right: 4, child: IconButton(tooltip: 'إغلاق', onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30))),
     ]),
   );
 }
