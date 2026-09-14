@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 
@@ -25,8 +26,9 @@ import 'screens/settings/settings_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Use media_kit/libmpv behind video_player. This keeps the existing
-  // VideoPlayerController API while greatly expanding Android codec support.
+  // Initialize libmpv/media_kit directly for the robust device-media player.
+  // Keep video_player_media_kit initialized as well for the existing feed player.
+  MediaKit.ensureInitialized();
   VideoPlayerMediaKit.ensureInitialized(android: true);
 
   await SystemChrome.setPreferredOrientations(const [
