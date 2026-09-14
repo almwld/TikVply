@@ -64,6 +64,7 @@ jobs:
           text = text.replace(marker, marker + '\n' + permissions, 1)
           text = text.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"', 1)
           text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"', 1)
+          text = text.replace('android:exported="true"', 'android:exported="true"\n            android:supportsPictureInPicture="true"', 1)
           marker = '    </activity>'
           intent_block = '''\n        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n        <intent-filter>\n            <action android:name="android.intent.action.SEND" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n'''
           if marker not in text:
@@ -82,7 +83,42 @@ jobs:
             <path android:fillColor="#0A8F83" android:pathData="M155,149 A9,9 0,1 0,173 149 A9,9 0,1 0,155 149"/>
           </vector>
           XML
-          grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|READ_MEDIA\|READ_EXTERNAL\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
+          cat > android/app/src/main/kotlin/com/tikvply/tikvply/MainActivity.kt <<'KOTLIN'
+          package com.tikvply.tikvply
+
+          import android.app.PictureInPictureParams
+          import android.content.res.Configuration
+          import android.os.Build
+          import android.util.Rational
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterActivity() {
+            private val channelName = "com.tikvply/player"
+
+            override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+              super.configureFlutterEngine(flutterEngine)
+              MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
+                when (call.method) {
+                  "isPipAvailable" -> result.success(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.hasSystemFeature("android.software.picture_in_picture"))
+                  "enterPip" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+                      result.success(enterPictureInPictureMode(params))
+                    } else result.success(false)
+                  }
+                  else -> result.notImplemented()
+                }
+              }
+            }
+
+            override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+              super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+            }
+          }
+          KOTLIN
+          grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|supportsPictureInPicture\|READ_MEDIA\|READ_EXTERNAL\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
 
       - name: Install TikVply dependencies
         run: flutter pub get
