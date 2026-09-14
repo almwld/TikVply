@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
+import '../../widgets/app_bar/tikvply_app_bar.dart';
 import '../../widgets/video/video_page.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
@@ -15,25 +17,41 @@ class MediaBrowserScreen extends StatefulWidget {
   @override State<MediaBrowserScreen> createState() => _MediaBrowserScreenState();
 }
 
-class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
+class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   String _query = '';
   String _sort = 'الأحدث';
+  Timer? _resumeRefreshDebounce;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final provider = context.read<VideoProvider>();
-      if (provider.videos.isEmpty && !provider.isLoading && !provider.isRefreshing) {
-        provider.refreshDeviceVideos();
-      }
-    });
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshIfNeeded(force: true));
+  }
+
+  Future<void> _refreshIfNeeded({bool force = false}) async {
+    if (!mounted) return;
+    final provider = context.read<VideoProvider>();
+    if (!force && (provider.isRefreshing || provider.isLoading)) return;
+    await provider.refreshDeviceVideos();
   }
 
   @override
-  void dispose() { _searchController.dispose(); super.dispose(); }
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _resumeRefreshDebounce?.cancel();
+      _resumeRefreshDebounce = Timer(const Duration(milliseconds: 350), () => _refreshIfNeeded());
+    }
+  }
+
+  @override
+  void dispose() {
+    _resumeRefreshDebounce?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,21 +66,21 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            leading: IconButton(tooltip: 'رجوع', onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_rounded)),
-            title: const Text('وسائط الهاتف'),
+          appBar: TikVplyAppBar(
+            title: 'وسائط الهاتف',
             actions: [Consumer<VideoProvider>(builder: (_, provider, __) => IconButton(
-              tooltip: 'تحديث',
-              onPressed: provider.isRefreshing ? null : provider.refreshDeviceVideos,
-              icon: provider.isRefreshing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.sync_rounded),
+              tooltip: 'تحديث المكتبة',
+              onPressed: provider.isRefreshing ? null : () => _refreshIfNeeded(force: true),
+              icon: provider.isRefreshing
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sync_rounded),
             ))],
           ),
           body: Consumer<VideoProvider>(builder: (_, provider, __) {
             final videos = _prepare(provider.videos);
             if (provider.isLoading && provider.videos.isEmpty) return const _MediaLoadingGrid();
             return RefreshIndicator(
-              onRefresh: provider.refreshDeviceVideos,
+              onRefresh: () => _refreshIfNeeded(force: true),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -74,11 +92,18 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                     SliverPadding(
                       padding: const EdgeInsets.all(5),
                       sliver: SliverGrid.builder(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4, childAspectRatio: .68),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 4,
+                          mainAxisSpacing: 4,
+                          childAspectRatio: .68,
+                        ),
                         itemCount: videos.length,
                         itemBuilder: (_, index) => _MediaTile(
                           video: videos[index],
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _MediaViewer(videos: videos, initialIndex: index))),
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => _MediaViewer(videos: videos, initialIndex: index),
+                          )),
                         ),
                       ),
                     ),
@@ -96,11 +121,15 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
     padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
     child: TextField(
       controller: _searchController,
+      textDirection: TextDirection.rtl,
       onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
       decoration: InputDecoration(
         hintText: 'ابحث في الفيديوهات...',
         prefixIcon: const Icon(Icons.search_rounded),
-        suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () { _searchController.clear(); setState(() => _query = ''); }, icon: const Icon(Icons.clear_rounded)),
+        suffixIcon: _query.isEmpty ? null : IconButton(
+          onPressed: () { _searchController.clear(); setState(() => _query = ''); },
+          icon: const Icon(Icons.clear_rounded),
+        ),
         filled: true,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       ),
@@ -109,7 +138,11 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
 
   Widget _sortRow(int count) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-    child: Row(children: [Text('$count فيديو', style: const TextStyle(fontWeight: FontWeight.w800)), const Spacer(), TextButton.icon(onPressed: _chooseSort, icon: const Icon(Icons.sort_rounded), label: Text(_sort))]),
+    child: Row(children: [
+      Text('$count فيديو', style: const TextStyle(fontWeight: FontWeight.w800)),
+      const Spacer(),
+      TextButton.icon(onPressed: _chooseSort, icon: const Icon(Icons.sort_rounded), label: Text(_sort)),
+    ]),
   );
 
   List<VideoModel> _prepare(List<VideoModel> source) {
@@ -124,20 +157,18 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
     final value = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(title: Text('ترتيب الوسائط', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
-            ...['الأحدث', 'الأقدم', 'المشاهدات'].map((option) => ListTile(
-              title: Text(option),
-              trailing: _sort == option ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () => Navigator.of(sheetContext).pop(option),
-            )),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      builder: (sheetContext) => SafeArea(child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(title: Text('ترتيب الوسائط', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+          ...['الأحدث', 'الأقدم', 'المشاهدات'].map((option) => ListTile(
+            title: Text(option),
+            trailing: _sort == option ? const Icon(Icons.check, color: AppColors.primary) : null,
+            onTap: () => Navigator.of(sheetContext).pop(option),
+          )),
+          const SizedBox(height: 8),
+        ],
+      )),
     );
     if (value != null && mounted) setState(() => _sort = value);
   }
@@ -150,10 +181,10 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
         const SizedBox(height: 14),
         Text(_query.isEmpty ? (provider.error ?? 'لا توجد فيديوهات') : 'لا توجد نتائج', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        Text(provider.error != null ? 'امنح التطبيق إذن الوسائط ثم أعد المحاولة.' : 'سيتم اكتشاف فيديوهات الهاتف تلقائيًا بعد منح إذن الوسائط.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+        Text(provider.error != null ? 'امنح TikVply إذن الصور والفيديوهات الكامل ثم اضغط تحديث.' : 'سيتم اكتشاف فيديوهات الهاتف تلقائيًا.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
         if (_query.isEmpty) ...[
           const SizedBox(height: 18),
-          FilledButton.icon(onPressed: provider.refreshDeviceVideos, icon: const Icon(Icons.sync), label: const Text('تحديث المكتبة')),
+          FilledButton.icon(onPressed: () => _refreshIfNeeded(force: true), icon: const Icon(Icons.sync), label: const Text('تحديث المكتبة')),
         ],
       ]),
     ),
@@ -175,21 +206,52 @@ class _MediaTile extends StatelessWidget {
   );
 }
 
-class _Thumbnail extends StatelessWidget {
+class _Thumbnail extends StatefulWidget {
   final String path;
   const _Thumbnail({required this.path});
+  @override State<_Thumbnail> createState() => _ThumbnailState();
+}
+
+class _ThumbnailState extends State<_Thumbnail> with AutomaticKeepAliveClientMixin {
+  late Future<String?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<String?> _load() async {
+    if (widget.path.startsWith('http')) return widget.path;
+    return VideoThumbnailService.instance.getThumbnailPath(widget.path);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Thumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) _future = _load();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (path.startsWith('http')) return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback());
+    super.build(context);
     return FutureBuilder<String?>(
-      future: VideoThumbnailService.instance.getThumbnailPath(path),
+      future: _future,
       builder: (_, snapshot) {
-        if (snapshot.hasData && snapshot.data!.isNotEmpty) return Image.file(File(snapshot.data!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallback());
-        return _fallback();
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const ColoredBox(color: Color(0xFF101820), child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))));
+        }
+        final source = snapshot.data;
+        if (source != null && source.isNotEmpty) {
+          final image = source.startsWith('http') ? Image.network(source, fit: BoxFit.cover) : Image.file(File(source), fit: BoxFit.cover);
+          return image;
+        }
+        return const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 28)));
       },
     );
   }
-  Widget _fallback() => const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 28)));
+
+  @override bool get wantKeepAlive => true;
 }
 
 class _MediaLoadingGrid extends StatelessWidget {
