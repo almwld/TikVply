@@ -56,7 +56,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setPlaybackSpeed(double value) async {
-    _playbackSpeed = value.clamp(0.25, 3.0).toDouble();
+    _playbackSpeed = value.clamp(0.25, 4.0).toDouble();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_speedKey, _playbackSpeed);
