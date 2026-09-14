@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../widgets/app_bar/tikvply_app_bar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -25,8 +26,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override void dispose() { _name.dispose(); _bio.dispose(); _avatar.dispose(); super.dispose(); }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('تعديل الملف الشخصي')),
+  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+    appBar: const TikVplyAppBar(title: 'تعديل الملف الشخصي'),
     body: Form(key: _formKey, child: ListView(padding: const EdgeInsets.all(20), children: [
       Center(child: CircleAvatar(radius: 48, backgroundColor: AppColors.primary, backgroundImage: _avatar.text.isNotEmpty ? NetworkImage(_avatar.text) : null, child: _avatar.text.isEmpty ? const Icon(Icons.person, color: Colors.white, size: 44) : null)),
       const SizedBox(height: 24),
@@ -38,7 +39,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       const SizedBox(height: 28),
       FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('حفظ التغييرات'))),
     ])),
-  );
+  ));
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
