@@ -15,6 +15,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
+  bool _skipSplash = false;
 
   @override
   void initState() {
@@ -24,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: const Interval(0, .6, curve: Curves.easeIn));
     _scaleAnimation = Tween<double>(begin: .86, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0, .75, curve: Curves.easeOutCubic)));
     Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
+      if (mounted && !_skipSplash) Navigator.pushReplacementNamed(context, AppRoutes.main);
     });
   }
 
@@ -36,6 +37,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final now = DateTime.now().millisecondsSinceEpoch;
     final shouldShow = last == null || now - last >= const Duration(hours: 12).inMilliseconds;
     if (!shouldShow) {
+      _skipSplash = true;
       if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
       return;
     }
