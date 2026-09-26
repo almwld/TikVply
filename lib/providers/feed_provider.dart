@@ -4,6 +4,8 @@ import '../models/user/user_model.dart';
 import '../services/local_video_service.dart';
 import '../services/device_media_service.dart';
 import '../services/local_video_interaction_service.dart';
+import '../services/media_playback_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum VideoSort { newest, oldest, duration }
 
@@ -61,6 +63,7 @@ class VideoProvider extends ChangeNotifier {
     _error = null;
     if (notify) notifyListeners();
     try {
+      final oldPaths = List<String>.from(_allVideos.map((v) => v.videoUrl));
       final paths = await _deviceMediaService.scanAllVideos();
       if (_deviceMediaService.permissionDenied) {
         _error = 'يحتاج TikVply إلى إذن الوصول إلى فيديوهات الهاتف';
@@ -68,6 +71,7 @@ class VideoProvider extends ChangeNotifier {
       }
       await _localVideoService.replacePaths(paths);
       await _setVideos(paths);
+      await _notifyAboutNewVideos(oldPaths, paths);
     } catch (error, stackTrace) {
       _error = 'تعذر تحديث مكتبة الفيديو';
       debugPrint('TikVply video library refresh failed: $error');
@@ -117,6 +121,18 @@ class VideoProvider extends ChangeNotifier {
   }
 
   static int _int(dynamic value) => value is num ? value.toInt() : 0;
+
+  Future<void> _notifyAboutNewVideos(List<String> oldPaths, List<String> newPaths) async {
+    if (oldPaths.isEmpty || newPaths.isEmpty) return;
+    final added = newPaths.where((path) => !oldPaths.contains(path)).length;
+    if (added == 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getInt('smart_unseen_notification_at_v1') ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - last < const Duration(hours: 6).inMilliseconds) return;
+    await prefs.setInt('smart_unseen_notification_at_v1', now);
+    await MediaPlaybackService.showSmartUnseenNotification(added);
+  }
 
   Future<void> updateVideoMetadata(String videoId, {Duration? duration, double? aspectRatio}) async {
     final index = _allVideos.indexWhere((video) => video.id == videoId);
