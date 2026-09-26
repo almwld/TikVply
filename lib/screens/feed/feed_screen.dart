@@ -233,6 +233,7 @@ class _FeedScreenState extends State<FeedScreen> {
             itemBuilder: (_, i) => VideoPage(
               key: ValueKey(videos.videos[i].id),
               video: videos.videos[i],
+              isActive: i == videos.currentIndex,
               onCompleted: context.read<VideoSettingsProvider>().autoNext ? () => _openNext(videos) : null,
             ),
           ),
