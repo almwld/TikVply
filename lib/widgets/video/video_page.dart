@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -41,9 +40,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   double _scaleBase = 1.0;
   bool _lastPlaying = false;
   Offset _likePosition = Offset.zero;
-  Offset? _gestureStart;
-  double _startBrightness = .5;
-  double _startVolume = 1;
   Duration? _a;
   Duration? _b;
   int? _sleepMinutes;
@@ -304,34 +300,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     });
   }
 
-  // Vertical brightness/volume gestures are handled by the outer feed.
-  Future<void> _verticalStart(DragStartDetails details) async {
-    if (_locked || !settings.gesturesEnabled) return;
-    _gestureStart = details.localPosition;
-    _startVolume = _controller?.value.volume ?? 1;
-    try {
-      _startBrightness = await ScreenBrightness.instance.application;
-    } catch (_) {
-      _startBrightness = .5;
-    }
-  }
-
-  void _verticalUpdate(DragUpdateDetails details) {
-    if (_locked || !settings.gesturesEnabled || _gestureStart == null) return;
-    final delta = -details.delta.dy / MediaQuery.sizeOf(context).height;
-    if (_gestureStart!.dx < MediaQuery.sizeOf(context).width / 2) {
-      ScreenBrightness.instance.setApplicationScreenBrightness((_startBrightness + delta).clamp(.05, 1.0).toDouble());
-    } else {
-      _controller?.setVolume((_startVolume + delta).clamp(0.0, 1.0).toDouble());
-    }
-    setState(() => _showControls = true);
-  }
-
-  void _verticalEnd(DragEndDetails details) {
-    _gestureStart = null;
-    _scheduleHide();
-  }
-
   Future<void> _fullscreenToggle() async {
     _fullscreen = !_fullscreen;
     if (_fullscreen) {
@@ -552,7 +520,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           left: 8,
           child: Row(
             children: [
-              _SmallAction(icon: Icons.timer, label: _sleepMinutes == null ? 'مؤقت' : '${_sleepMinutes}د', onTap: _sleepMenu),
+              _SmallAction(icon: Icons.timer, label: _sleepMinutes == null ? 'مؤقت' : '$_sleepMinutesد', onTap: _sleepMenu),
               const SizedBox(width: 6),
               _SmallAction(icon: Icons.repeat, label: _b == null ? 'A-B' : 'A-B ✓', onTap: _ab),
             ],
