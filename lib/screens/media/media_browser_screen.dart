@@ -277,7 +277,8 @@ class _MediaViewer extends StatefulWidget {
 
 class _MediaViewerState extends State<_MediaViewer> {
   late final PageController _controller;
-  @override void initState() { super.initState(); _controller = PageController(initialPage: widget.initialIndex); }
+  late int _activeIndex;
+  @override void initState() { super.initState(); _activeIndex = widget.initialIndex; _controller = PageController(initialPage: widget.initialIndex); }
   @override void dispose() { _controller.dispose(); super.dispose(); }
   void _next() {
     if (!_controller.hasClients) return;
@@ -295,6 +296,7 @@ class _MediaViewerState extends State<_MediaViewer> {
       PageView.builder(
         scrollDirection: Axis.vertical,
         controller: _controller,
+        onPageChanged: (index) => setState(() => _activeIndex = index),
         itemCount: widget.videos.length,
         itemBuilder: (_, index) => MxVideoPage(
           key: ValueKey(widget.videos[index].id),
