@@ -19,7 +19,8 @@ import 'video_info.dart';
 class VideoPage extends StatefulWidget {
   final VideoModel video;
   final VoidCallback? onCompleted;
-  const VideoPage({super.key, required this.video, this.onCompleted});
+  final bool isActive;
+  const VideoPage({super.key, required this.video, this.onCompleted, this.isActive = true});
   @override State<VideoPage> createState() => _VideoPageState();
 }
 
@@ -57,6 +58,33 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     settings.addListener(_applySettings);
     _open();
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        MediaPlaybackService.setActiveHandler(_handleMediaAction);
+      } else {
+        MediaPlaybackService.setActiveHandler(null);
+      }
+    }
+  }
+
+  Future<void> _handleMediaAction(String action) async {
+    if (!widget.isActive || !mounted) return;
+    switch (action) {
+      case 'toggle':
+      case 'play':
+        _togglePlay();
+        break;
+      case 'next':
+        widget.onCompleted?.call();
+        break;
+      case 'open':
+        break;
+    }
   }
 
   Future<void> _open() async {
@@ -98,6 +126,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       setState(() => _loading = false);
+      if (widget.isActive) MediaPlaybackService.setActiveHandler(_handleMediaAction);
       if (settings.autoplay) {
         await controller.play();
         _lastPlaying = true;
@@ -398,6 +427,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
+    if (widget.isActive) MediaPlaybackService.setActiveHandler(null);
     MediaPlaybackService.stop();
     WakelockPlus.disable();
     if (_fullscreen) {
