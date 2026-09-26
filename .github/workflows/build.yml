@@ -74,7 +74,7 @@ jobs:
             android:name=".MediaPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-'''
+          '''
           text = text.replace('</application>', service_block + '    </application>', 1)
           text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"', 1)
           text = text.replace('android:exported="true"', 'android:exported="true"\n            android:launchMode="singleTop"\n            android:supportsPictureInPicture="true"', 1)
