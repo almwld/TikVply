@@ -12,6 +12,7 @@ import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_playback_state_service.dart';
+import '../../services/media_playback_service.dart';
 import 'video_actions.dart';
 import 'video_info.dart';
 
@@ -36,6 +37,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   bool _inPip = false;
   bool _completionSent = false;
   bool _like = false;
+  double _zoom = 1.0;
+  double _scaleBase = 1.0;
+  bool _lastPlaying = false;
   Offset _likePosition = Offset.zero;
   Offset? _gestureStart;
   double _startBrightness = .5;
@@ -67,8 +71,20 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _loading = true);
     try {
       final controller = _network
-          ? VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl))
-          : VideoPlayerController.file(File(widget.video.videoUrl));
+          ? VideoPlayerController.networkUrl(
+              Uri.parse(widget.video.videoUrl),
+              videoPlayerOptions: const VideoPlayerOptions(
+                allowBackgroundPlayback: true,
+                mixWithOthers: false,
+              ),
+            )
+          : VideoPlayerController.file(
+              File(widget.video.videoUrl),
+              videoPlayerOptions: const VideoPlayerOptions(
+                allowBackgroundPlayback: true,
+                mixWithOthers: false,
+              ),
+            );
       _controller = controller;
       controller.addListener(_listener);
       await controller.initialize();
@@ -82,7 +98,11 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       setState(() => _loading = false);
-      if (settings.autoplay) await controller.play();
+      if (settings.autoplay) {
+        await controller.play();
+        _lastPlaying = true;
+        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+      }
       _startSaving();
       _scheduleHide();
       final provider = context.read<VideoProvider>();
@@ -108,6 +128,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void _listener() {
     final c = _controller;
     if (c == null || !mounted || !c.value.isInitialized) return;
+    if (c.value.isPlaying != _lastPlaying) {
+      _lastPlaying = c.value.isPlaying;
+      MediaPlaybackService.update(playing: _lastPlaying);
+    }
     if (c.value.hasError) {
       if (!_completionSent && widget.onCompleted != null) {
         _completionSent = true;
@@ -162,15 +186,18 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final c = _controller;
-    if (state == AppLifecycleState.resumed && settings.keepScreenAwake && c?.value.isPlaying == true) {
-      WakelockPlus.enable();
-    }
+    if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      if (c != null && c.value.isInitialized) {
-        _savePosition(c.value.position);
-        if (!_inPip) c.pause();
+      _savePosition(c.value.position);
+      // Do not pause here. video_player is explicitly configured with
+      // allowBackgroundPlayback so audio/video continues when the app is
+      // backgrounded or the status bar is pulled down.
+      if (c.value.isPlaying && settings.mediaNotifications) {
+        MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
       }
-      if (!_inPip) WakelockPlus.disable();
+      WakelockPlus.disable();
+    } else if (state == AppLifecycleState.resumed && c.value.isPlaying && settings.keepScreenAwake) {
+      WakelockPlus.enable();
     }
   }
 
@@ -179,9 +206,13 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (_locked || c == null || !c.value.isInitialized) return;
     if (c.value.isPlaying) {
       c.pause();
+      _lastPlaying = false;
+      MediaPlaybackService.update(playing: false);
       WakelockPlus.disable();
     } else {
       c.play();
+      _lastPlaying = true;
+      MediaPlaybackService.update(playing: true);
       if (settings.keepScreenAwake) WakelockPlus.enable();
     }
     setState(() => _showControls = true);
@@ -367,6 +398,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
+    MediaPlaybackService.stop();
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -415,9 +447,17 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       behavior: HitTestBehavior.opaque,
       onTap: _tap,
       onDoubleTapDown: _doubleTap,
-      onVerticalDragStart: _verticalStart,
-      onVerticalDragUpdate: _verticalUpdate,
-      onVerticalDragEnd: _verticalEnd,
+      onScaleStart: (_) {
+        _scaleBase = _zoom;
+      },
+      onScaleUpdate: (details) {
+        if (details.pointerCount < 2) return;
+        final next = (_scaleBase * details.scale).clamp(1.0, 3.0).toDouble();
+        if ((next - _zoom).abs() > .01 && mounted) setState(() => _zoom = next);
+      },
+      onScaleEnd: (_) {
+        if (_zoom < 1.05 && mounted) setState(() => _zoom = 1.0);
+      },
       onHorizontalDragEnd: settings.gesturesEnabled
           ? (details) {
               final velocity = details.primaryVelocity ?? 0;
@@ -435,10 +475,13 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               VideoFitMode.fill => BoxFit.fill,
             };
             return SizedBox.expand(
-              child: FittedBox(
+              child: Transform.scale(
+                scale: _zoom,
+                child: FittedBox(
                 fit: fit,
                 clipBehavior: Clip.hardEdge,
-                child: SizedBox(width: value.size.width, height: value.size.height, child: VideoPlayer(c)),
+                  child: SizedBox(width: value.size.width, height: value.size.height, child: VideoPlayer(c)),
+                ),
               ),
             );
           },
@@ -473,8 +516,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
             ],
           ),
         ),
-        Positioned(left: 12, right: 78, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
-        Positioned(right: 10, bottom: 92, child: VideoActions(video: widget.video)),
+        Positioned(left: 78, right: 12, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
+        Positioned(left: 10, bottom: 92, child: VideoActions(video: widget.video)),
+        if (_zoom > 1.05)
+          Positioned(left: 12, bottom: 205, child: Material(color: Colors.black54, shape: const CircleBorder(), child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: () => setState(() => _zoom = 1.0), icon: const Icon(Icons.fit_screen_rounded, color: Colors.white))),
         if (_showControls)
           Positioned(
             left: 12,
