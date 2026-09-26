@@ -65,16 +65,16 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         if (c == null || !c.value.isInitialized) {
           _open();
         } else if (settings.autoplay && !c.value.isPlaying) {
-          await c.play();
+          c.play();
           _lastPlaying = true;
-          await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+          MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
         }
       } else {
         if (c != null && c.value.isInitialized) {
-          await c.pause();
-          await _savePosition(c.value.position);
+          c.pause();
+          _savePosition(c.value.position);
           c.removeListener(_listener);
-          await c.dispose();
+          c.dispose();
           _controller = null;
         }
         WakelockPlus.disable();
