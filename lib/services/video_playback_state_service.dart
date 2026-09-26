@@ -21,7 +21,6 @@ class VideoPlaybackStateService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_prefix$videoId');
   }
-}
 
   Future<void> markWatched(String videoId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,3 +31,4 @@ class VideoPlaybackStateService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('$_watchedPrefix$videoId') ?? false;
   }
+}
