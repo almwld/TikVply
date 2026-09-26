@@ -64,10 +64,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void didUpdateWidget(covariant VideoPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive != oldWidget.isActive) {
+      final c = _controller;
       if (widget.isActive) {
         MediaPlaybackService.setActiveHandler(_handleMediaAction);
+        if (c != null && c.value.isInitialized && settings.autoplay && !c.value.isPlaying) {
+          c.play();
+          _lastPlaying = true;
+          MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+        }
       } else {
         MediaPlaybackService.setActiveHandler(null);
+        if (c != null && c.value.isInitialized && c.value.isPlaying) {
+          c.pause();
+        }
       }
     }
   }
@@ -127,7 +136,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() => _loading = false);
       if (widget.isActive) MediaPlaybackService.setActiveHandler(_handleMediaAction);
-      if (settings.autoplay) {
+      if (settings.autoplay && widget.isActive) {
         await controller.play();
         _lastPlaying = true;
         await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
