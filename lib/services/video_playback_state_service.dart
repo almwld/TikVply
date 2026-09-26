@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoPlaybackStateService {
   static const String _prefix = 'playback_position_ms_v1_';
+  static const String _watchedPrefix = 'watched_video_v1_';
 
   Future<Duration?> loadPosition(String videoId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,3 +22,13 @@ class VideoPlaybackStateService {
     await prefs.remove('$_prefix$videoId');
   }
 }
+
+  Future<void> markWatched(String videoId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_watchedPrefix$videoId', true);
+  }
+
+  Future<bool> isWatched(String videoId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('$_watchedPrefix$videoId') ?? false;
+  }
