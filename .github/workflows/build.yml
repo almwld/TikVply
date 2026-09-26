@@ -63,28 +63,76 @@ jobs:
           gradle.write_text(text)
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
-          text = manifest.read_text()
-          permissions = '''    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n'''
-          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
-          if marker not in text:
-              raise SystemExit('Could not locate Android manifest root')
-          text = text.replace(marker, marker + '\n' + permissions, 1)
-          text = text.replace('<application', '<application android:hardwareAccelerated="true" android:largeHeap="true"', 1)
-          service_block = '''        <service
-            android:name=".MediaPlaybackService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
-          '''
-          text = text.replace('</application>', service_block + '    </application>', 1)
-          text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/tikvply_launcher"', 1)
-          text = text.replace('android:exported="true"', 'android:exported="true"\n            android:launchMode="singleTop"\n            android:supportsPictureInPicture="true"', 1)
-          marker = '    </activity>'
-          intent_block = '''\n        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n        <intent-filter>\n            <action android:name="android.intent.action.SEND" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <data android:mimeType="video/*" />\n        </intent-filter>\n'''
-          if marker not in text:
-              raise SystemExit('Could not locate MainActivity closing tag')
-          text = text.replace(marker, intent_block + marker, 1)
-          manifest.write_text(text)
-          PY
+          import xml.etree.ElementTree as ET
+
+          ET.register_namespace('android', 'http://schemas.android.com/apk/res/android')
+          tree = ET.parse(manifest)
+          root = tree.getroot()
+          ANDROID = '{http://schemas.android.com/apk/res/android}'
+
+          def add_permission(name):
+              if not any(p.get(ANDROID + 'name') == name for p in root.findall('uses-permission')):
+                  root.insert(0, ET.Element('uses-permission', {ANDROID + 'name': name}))
+
+          for permission in (
+              'android.permission.INTERNET',
+              'android.permission.POST_NOTIFICATIONS',
+              'android.permission.FOREGROUND_SERVICE',
+              'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+              'android.permission.READ_MEDIA_VIDEO',
+              'android.permission.READ_MEDIA_IMAGES',
+              'android.permission.READ_EXTERNAL_STORAGE',
+          ):
+              add_permission(permission)
+
+          application = root.find('application')
+          if application is None:
+              raise SystemExit('Could not locate Android application element')
+          application.set(ANDROID + 'hardwareAccelerated', 'true')
+          application.set(ANDROID + 'largeHeap', 'true')
+          application.set(ANDROID + 'icon', '@drawable/tikvply_launcher')
+
+          service = None
+          for item in application.findall('service'):
+              if item.get(ANDROID + 'name') == '.MediaPlaybackService':
+                  service = item
+                  break
+          if service is None:
+              service = ET.SubElement(application, 'service')
+          service.set(ANDROID + 'name', '.MediaPlaybackService')
+          service.set(ANDROID + 'exported', 'false')
+          service.set(ANDROID + 'foregroundServiceType', 'mediaPlayback')
+
+          activity = None
+          for item in application.findall('activity'):
+              if item.get(ANDROID + 'name') == '.MainActivity':
+                  activity = item
+                  break
+          if activity is None:
+              raise SystemExit('Could not locate MainActivity in generated manifest')
+          activity.set(ANDROID + 'exported', 'true')
+          activity.set(ANDROID + 'launchMode', 'singleTop')
+          activity.set(ANDROID + 'supportsPictureInPicture', 'true')
+
+          def add_video_filter(action, categories):
+              intent = ET.SubElement(activity, 'intent-filter')
+              ET.SubElement(intent, 'action', {ANDROID + 'name': action})
+              for category in categories:
+                  ET.SubElement(intent, 'category', {ANDROID + 'name': category})
+              ET.SubElement(intent, 'data', {ANDROID + 'mimeType': 'video/*'})
+
+          add_video_filter('android.intent.action.VIEW', (
+              'android.intent.category.DEFAULT',
+              'android.intent.category.BROWSABLE',
+          ))
+          add_video_filter('android.intent.action.SEND', (
+              'android.intent.category.DEFAULT',
+          ))
+
+          tree.write(manifest, encoding='utf-8', xml_declaration=True)
+          ET.parse(manifest)
+          print('Validated generated AndroidManifest.xml successfully')
+PY
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/tikvply_launcher.xml <<'XML'
           <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
