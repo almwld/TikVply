@@ -81,6 +81,7 @@ jobs:
               'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
               'android.permission.READ_MEDIA_VIDEO',
               'android.permission.READ_MEDIA_IMAGES',
+              'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
               'android.permission.READ_EXTERNAL_STORAGE',
           ):
               add_permission(permission)
@@ -105,11 +106,12 @@ jobs:
 
           activity = None
           for item in application.findall('activity'):
-              if item.get(ANDROID + 'name') == '.MainActivity':
+              name = item.get(ANDROID + 'name', '')
+              if name in ('.MainActivity', '${applicationName}') or name.endswith('.MainActivity'):
                   activity = item
                   break
           if activity is None:
-              raise SystemExit('Could not locate MainActivity in generated manifest')
+              raise SystemExit('Could not locate generated MainActivity in manifest')
           activity.set(ANDROID + 'exported', 'true')
           activity.set(ANDROID + 'launchMode', 'singleTop')
           activity.set(ANDROID + 'supportsPictureInPicture', 'true')
