@@ -1,0 +1,24 @@
+name: TikVply Runner Smoke Test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke:
+    name: Verify GitHub Actions Runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Runner check
+        run: |
+          set -euo pipefail
+          echo "GitHub Actions runner is available."
+          uname -a
+          git --version
+          java -version
+          python3 --version
