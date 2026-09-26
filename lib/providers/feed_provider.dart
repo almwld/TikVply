@@ -5,6 +5,7 @@ import '../services/local_video_service.dart';
 import '../services/device_media_service.dart';
 import '../services/local_video_interaction_service.dart';
 import '../services/media_playback_service.dart';
+import '../services/video_playback_state_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum VideoSort { newest, oldest, duration }
@@ -124,14 +125,25 @@ class VideoProvider extends ChangeNotifier {
 
   Future<void> _notifyAboutNewVideos(List<String> oldPaths, List<String> newPaths) async {
     if (oldPaths.isEmpty || newPaths.isEmpty) return;
-    final added = newPaths.where((path) => !oldPaths.contains(path)).length;
-    if (added == 0) return;
+
+    // Notify only for newly discovered videos that the user has not watched.
+    final playbackState = VideoPlaybackStateService();
+    var unseenAdded = 0;
+    for (final path in newPaths) {
+      if (oldPaths.contains(path)) continue;
+      final id = 'local_${path.hashCode}';
+      if (!await playbackState.isWatched(id)) {
+        unseenAdded++;
+      }
+    }
+    if (unseenAdded == 0) return;
+
     final prefs = await SharedPreferences.getInstance();
     final last = prefs.getInt('smart_unseen_notification_at_v1') ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - last < const Duration(hours: 6).inMilliseconds) return;
     await prefs.setInt('smart_unseen_notification_at_v1', now);
-    await MediaPlaybackService.showSmartUnseenNotification(added);
+    await MediaPlaybackService.showSmartUnseenNotification(unseenAdded);
   }
 
   Future<void> updateVideoMetadata(String videoId, {Duration? duration, double? aspectRatio}) async {
