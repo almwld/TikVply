@@ -35,7 +35,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   bool _showControls = true;
   bool _locked = false;
   bool _fullscreen = false;
-  bool _inPip = false;
   bool _completionSent = false;
   bool _like = false;
   double _zoom = 1.0;
@@ -110,7 +109,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       final controller = _network
           ? VideoPlayerController.networkUrl(
               Uri.parse(widget.video.videoUrl),
-              videoPlayerOptions: const VideoPlayerOptions(
+              videoPlayerOptions: VideoPlayerOptions(
                 allowBackgroundPlayback: true,
                 mixWithOthers: false,
               ),
@@ -305,6 +304,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     });
   }
 
+  // Vertical brightness/volume gestures are handled by the outer feed.
   Future<void> _verticalStart(DragStartDetails details) async {
     if (_locked || !settings.gesturesEnabled) return;
     _gestureStart = details.localPosition;
@@ -348,11 +348,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     try {
       final available = await _platform.invokeMethod<bool>('isPipAvailable') ?? false;
       if (!available) return;
-      _inPip = true;
       await _platform.invokeMethod('enterPip');
       await _controller?.play();
     } catch (_) {
-      _inPip = false;
     }
   }
 
