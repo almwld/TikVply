@@ -83,7 +83,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
               onRefresh: () => _refreshIfNeeded(force: true),
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                cacheExtent: 700,
+                cacheExtent: 420,
                 slivers: [
                   SliverToBoxAdapter(child: _searchField()),
                   SliverToBoxAdapter(child: _sortRow(videos.length)),
@@ -214,7 +214,7 @@ class _Thumbnail extends StatefulWidget {
   @override State<_Thumbnail> createState() => _ThumbnailState();
 }
 
-class _ThumbnailState extends State<_Thumbnail> with AutomaticKeepAliveClientMixin {
+class _ThumbnailState extends State<_Thumbnail> {
   late Future<String?> _future;
 
   @override
@@ -236,7 +236,6 @@ class _ThumbnailState extends State<_Thumbnail> with AutomaticKeepAliveClientMix
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     return FutureBuilder<String?>(
       future: _future,
       builder: (_, snapshot) {
@@ -255,7 +254,6 @@ class _ThumbnailState extends State<_Thumbnail> with AutomaticKeepAliveClientMix
     );
   }
 
-  @override bool get wantKeepAlive => true;
 }
 
 class _MediaLoadingGrid extends StatelessWidget {
