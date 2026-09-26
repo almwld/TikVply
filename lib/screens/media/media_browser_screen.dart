@@ -277,8 +277,20 @@ class _MediaViewer extends StatefulWidget {
 
 class _MediaViewerState extends State<_MediaViewer> {
   late final PageController _controller;
-  @override void initState() { super.initState(); _controller = PageController(initialPage: widget.initialIndex); }
-  @override void dispose() { _controller.dispose(); super.dispose(); }
+  late int _activeIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeIndex = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
   void _next() {
     if (!_controller.hasClients) return;
     final page = _controller.page?.round() ?? widget.initialIndex;
@@ -295,10 +307,15 @@ class _MediaViewerState extends State<_MediaViewer> {
       PageView.builder(
         scrollDirection: Axis.vertical,
         controller: _controller,
+        allowImplicitScrolling: false,
+        onPageChanged: (index) {
+          if (mounted) setState(() => _activeIndex = index);
+        },
         itemCount: widget.videos.length,
         itemBuilder: (_, index) => VideoPage(
           key: ValueKey(widget.videos[index].id),
           video: widget.videos[index],
+          isActive: index == _activeIndex,
           onCompleted: context.read<VideoSettingsProvider>().autoNext ? _next : null,
         ),
       ),
