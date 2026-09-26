@@ -166,6 +166,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void _listener() {
     final c = _controller;
     if (c == null || !mounted || !c.value.isInitialized) return;
+    if (c.value.isInitialized && c.value.duration > Duration.zero && c.value.position >= c.value.duration * 0.8) {
+      _playback.markWatched(widget.video.id);
+    }
     if (c.value.isPlaying != _lastPlaying) {
       _lastPlaying = c.value.isPlaying;
       MediaPlaybackService.update(playing: _lastPlaying);
