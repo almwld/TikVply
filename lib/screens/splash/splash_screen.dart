@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 
@@ -19,11 +20,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _controller = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this)..forward();
+    _gateSplash();
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: const Interval(0, .6, curve: Curves.easeIn));
     _scaleAnimation = Tween<double>(begin: .86, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0, .75, curve: Curves.easeOutCubic)));
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
     });
+  }
+
+  static const _lastShownKey = 'splash_last_shown_at_v1';
+
+  Future<void> _gateSplash() async {
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getInt(_lastShownKey);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final shouldShow = last == null || now - last >= const Duration(hours: 12).inMilliseconds;
+    if (!shouldShow) {
+      if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
+      return;
+    }
+    await prefs.setInt(_lastShownKey, now);
   }
 
   @override
