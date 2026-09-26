@@ -62,16 +62,23 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       final c = _controller;
       if (widget.isActive) {
         MediaPlaybackService.setActiveHandler(_handleMediaAction);
-        if (c != null && c.value.isInitialized && settings.autoplay && !c.value.isPlaying) {
-          c.play();
+        if (c == null || !c.value.isInitialized) {
+          await _open();
+        } else if (settings.autoplay && !c.value.isPlaying) {
+          await c.play();
           _lastPlaying = true;
-          MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+          await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
         }
       } else {
-        MediaPlaybackService.setActiveHandler(null);
-        if (c != null && c.value.isInitialized && c.value.isPlaying) {
-          c.pause();
+        if (c != null && c.value.isInitialized) {
+          await c.pause();
+          await _savePosition(c.value.position);
+          c.removeListener(_listener);
+          await c.dispose();
+          _controller = null;
         }
+        WakelockPlus.disable();
+        if (mounted) setState(() => _loading = false);
       }
     }
   }
@@ -80,8 +87,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!widget.isActive || !mounted) return;
     switch (action) {
       case 'toggle':
-      case 'play':
         _togglePlay();
+        break;
+      case 'play':
+        _playOnly();
         break;
       case 'next':
         widget.onCompleted?.call();
@@ -92,6 +101,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   Future<void> _open() async {
+    // PageView can build neighboring pages. Only the visible page may
+    // initialize a decoder; inactive pages release their decoder entirely.
+    if (!widget.isActive) {
+      final previous = _controller;
+      _controller = null;
+      if (previous != null) {
+        previous.removeListener(_listener);
+        await previous.dispose();
+      }
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
     final previous = _controller;
     _controller = null;
     _saveTimer?.cancel();
@@ -234,6 +256,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       WakelockPlus.disable();
     } else if (state == AppLifecycleState.resumed && c.value.isPlaying && settings.keepScreenAwake) {
       WakelockPlus.enable();
+    }
+  }
+
+  Future<void> _playOnly() async {
+    final c = _controller;
+    if (_locked || c == null || !c.value.isInitialized) return;
+    if (!c.value.isPlaying) await c.play();
+    _lastPlaying = true;
+    await MediaPlaybackService.update(playing: true);
+    if (settings.keepScreenAwake) await WakelockPlus.enable();
+    if (mounted) {
+      setState(() => _showControls = true);
+      _scheduleHide();
     }
   }
 
