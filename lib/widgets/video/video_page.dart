@@ -63,7 +63,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (widget.isActive) {
         MediaPlaybackService.setActiveHandler(_handleMediaAction);
         if (c == null || !c.value.isInitialized) {
-          await _open();
+          _open();
         } else if (settings.autoplay && !c.value.isPlaying) {
           await c.play();
           _lastPlaying = true;
