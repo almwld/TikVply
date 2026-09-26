@@ -116,7 +116,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
             )
           : VideoPlayerController.file(
               File(widget.video.videoUrl),
-              videoPlayerOptions: const VideoPlayerOptions(
+              videoPlayerOptions: VideoPlayerOptions(
                 allowBackgroundPlayback: true,
                 mixWithOthers: false,
               ),
@@ -560,8 +560,23 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         ),
         Positioned(left: 78, right: 12, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
         Positioned(right: 10, bottom: 92, child: VideoActions(video: widget.video)),
-        if (_zoom > 1.05)
-          Positioned(left: 12, bottom: 205, child: Material(color: Colors.black54, shape: const CircleBorder(), child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: () => setState(() => _zoom = 1.0), icon: const Icon(Icons.fit_screen_rounded, color: Colors.white))),
+        ...(_zoom > 1.05
+            ? <Widget>[
+                Positioned(
+                  left: 12,
+                  bottom: 205,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'إعادة حجم الفيديو',
+                      onPressed: () => setState(() => _zoom = 1.0),
+                      icon: const Icon(Icons.fit_screen_rounded, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ]
+            : const <Widget>[]),
         if (_showControls)
           Positioned(
             left: 12,
