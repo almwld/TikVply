@@ -5,6 +5,22 @@ import 'package:flutter/services.dart';
 /// system transport controls and keeps a media foreground service alive.
 class MediaPlaybackService {
   static const MethodChannel _channel = MethodChannel('com.tikvply/media');
+  static Future<void> Function(String action)? _activeHandler;
+  static bool _handlerInstalled = false;
+
+  static void initialize() {
+    if (_handlerInstalled) return;
+    _handlerInstalled = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'mediaAction') {
+        await _activeHandler?.call(call.arguments?.toString() ?? 'open');
+      }
+    });
+  }
+
+  static void setActiveHandler(Future<void> Function(String action)? handler) {
+    _activeHandler = handler;
+  }
 
   static Future<void> requestNotificationPermission() async {
     try { await _channel.invokeMethod('requestNotificationPermission'); } catch (_) {}
