@@ -7,19 +7,37 @@ class MediaPlaybackService {
   static const MethodChannel _channel = MethodChannel('com.tikvply/media');
   static Future<void> Function(String action)? _activeHandler;
   static bool _handlerInstalled = false;
+  static final List<String> _pendingActions = <String>[];
 
   static void initialize() {
     if (_handlerInstalled) return;
     _handlerInstalled = true;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'mediaAction') {
-        await _activeHandler?.call(call.arguments?.toString() ?? 'open');
+        final action = call.arguments?.toString() ?? 'open';
+        final handler = _activeHandler;
+        if (handler != null) {
+          await handler(action);
+        } else {
+          _pendingActions
+            ..clear()
+            ..add(action);
+        }
       }
     });
   }
 
   static void setActiveHandler(Future<void> Function(String action)? handler) {
     _activeHandler = handler;
+    if (handler == null || _pendingActions.isEmpty) return;
+    final actions = List<String>.from(_pendingActions);
+    _pendingActions.clear();
+    for (final action in actions) {
+      Future<void>.microtask(() async {
+        final active = _activeHandler;
+        if (active != null) await active(action);
+      });
+    }
   }
 
   static Future<void> requestNotificationPermission() async {
