@@ -148,7 +148,7 @@ jobs:
                     val intent = Intent(this, MediaPlaybackService::class.java)
                       .putExtra("playing", playing)
                       .putExtra("updateOnly", true)
-                    startService(intent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
                     result.success(true)
                   }
                   "stopMedia" -> {
@@ -274,7 +274,7 @@ jobs:
                 .setOngoing(playing)
                 .setCategory(Notification.CATEGORY_TRANSPORT)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setStyle(Notification.MediaStyle().setShowActionsInCompactView(0))
+                .setStyle(Notification.MediaStyle().setMediaSession(mediaSession?.sessionToken).setShowActionsInCompactView(0))
                 .addAction(Notification.Action.Builder(
                   if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
                   if (playing) "إيقاف مؤقت" else "تشغيل",
