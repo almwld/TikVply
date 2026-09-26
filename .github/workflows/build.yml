@@ -32,8 +32,15 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.35.7'
           cache: true
+
+      - name: Verify workflow toolchain
+        run: |
+          set -euo pipefail
+          java -version
+          python3 --version
+          git --version
 
       - name: Show Flutter version
         run: flutter --version
@@ -249,7 +256,11 @@ jobs:
             override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
               intent?.getStringExtra("title")?.let { title = it }
               if (intent?.hasExtra("playing") == true) playing = intent.getBooleanExtra("playing", true)
-              startForeground(MEDIA_NOTIFICATION_ID, buildNotification())
+              if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(MEDIA_NOTIFICATION_ID, buildNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+              } else {
+                startForeground(MEDIA_NOTIFICATION_ID, buildNotification())
+              }
               return START_STICKY
             }
 
@@ -296,6 +307,15 @@ jobs:
           }
           KOTLIN
           grep -n 'compileSdk\|android:icon\|hardwareAccelerated\|supportsPictureInPicture\|READ_MEDIA\|READ_EXTERNAL\|FOREGROUND_SERVICE\|mimeType="video' android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml
+
+      - name: Validate generated Android project
+        run: |
+          set -euo pipefail
+          test -f android/settings.gradle.kts
+          test -f android/app/build.gradle.kts
+          test -f android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/kotlin/com/tikvply/tikvply/MainActivity.kt
+          test -f android/app/src/main/kotlin/com/tikvply/tikvply/MediaPlaybackService.kt
 
       - name: Install TikVply dependencies
         run: flutter pub get
