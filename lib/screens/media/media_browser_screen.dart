@@ -10,7 +10,6 @@ import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
-import '../../widgets/video/video_page.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
   const MediaBrowserScreen({super.key});
@@ -277,8 +276,7 @@ class _MediaViewer extends StatefulWidget {
 
 class _MediaViewerState extends State<_MediaViewer> {
   late final PageController _controller;
-  late int _activeIndex;
-  @override void initState() { super.initState(); _activeIndex = widget.initialIndex; _controller = PageController(initialPage: widget.initialIndex); }
+  @override void initState() { super.initState(); _controller = PageController(initialPage: widget.initialIndex); }
   @override void dispose() { _controller.dispose(); super.dispose(); }
   void _next() {
     if (!_controller.hasClients) return;
@@ -296,9 +294,8 @@ class _MediaViewerState extends State<_MediaViewer> {
       PageView.builder(
         scrollDirection: Axis.vertical,
         controller: _controller,
-        onPageChanged: (index) => setState(() => _activeIndex = index),
         itemCount: widget.videos.length,
-        itemBuilder: (_, index) => MxVideoPage(
+        itemBuilder: (_, index) => VideoPage(
           key: ValueKey(widget.videos[index].id),
           video: widget.videos[index],
           onCompleted: context.read<VideoSettingsProvider>().autoNext ? _next : null,
