@@ -132,7 +132,7 @@ jobs:
           tree.write(manifest, encoding='utf-8', xml_declaration=True)
           ET.parse(manifest)
           print('Validated generated AndroidManifest.xml successfully')
-PY
+          PY
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/tikvply_launcher.xml <<'XML'
           <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
