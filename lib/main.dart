@@ -22,6 +22,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/upload/upload_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'services/media_playback_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,7 @@ Future<void> main() async {
   // Initialize libmpv/media_kit directly for the robust device-media player.
   // Keep video_player_media_kit initialized as well for the existing feed player.
   MediaKit.ensureInitialized();
+  MediaPlaybackService.initialize();
   VideoPlayerMediaKit.ensureInitialized(android: true);
 
   await SystemChrome.setPreferredOrientations(const [
