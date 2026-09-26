@@ -427,8 +427,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
-    if (widget.isActive) MediaPlaybackService.setActiveHandler(null);
-    MediaPlaybackService.stop();
+    if (widget.isActive) {
+      MediaPlaybackService.setActiveHandler(null);
+      MediaPlaybackService.stop();
+    }
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
