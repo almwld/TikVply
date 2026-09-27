@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/video/video_model.dart';
@@ -183,10 +184,25 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
         const SizedBox(height: 14),
         Text(_query.isEmpty ? (provider.error ?? 'لا توجد فيديوهات') : 'لا توجد نتائج', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        Text(provider.error != null ? 'امنح TikVply إذن الصور والفيديوهات الكامل ثم اضغط تحديث.' : 'سيتم اكتشاف فيديوهات الهاتف تلقائيًا.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+        Text(
+          provider.error != null
+              ? 'امنح TikVply إذن الوصول إلى الفيديوهات، أو وسّع قائمة الفيديوهات المسموح بها من إعدادات النظام.'
+              : 'سيتم اكتشاف فيديوهات الهاتف تلقائيًا، بما فيها وسائط التخزين الخارجية عند ظهورها في مكتبة النظام.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.grey),
+        ),
         if (_query.isEmpty) ...[
           const SizedBox(height: 18),
           FilledButton.icon(onPressed: () => _refreshIfNeeded(force: true), icon: const Icon(Icons.sync), label: const Text('تحديث المكتبة')),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await PhotoManager.presentLimited(type: RequestType.video);
+              if (mounted) await _refreshIfNeeded(force: true);
+            },
+            icon: const Icon(Icons.video_library_outlined),
+            label: const Text('إدارة الفيديوهات المسموح بها'),
+          ),
         ],
       ]),
     ),
