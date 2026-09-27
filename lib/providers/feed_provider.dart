@@ -104,31 +104,50 @@ class VideoProvider extends ChangeNotifier {
 
   Future<void> _setVideos(List<String> paths) async {
     final user = _localUser();
-    final uniquePaths = <String>{...paths}.where((path) => path.isNotEmpty).toList(growable: false);
+    final uniquePaths = <String>{...paths}
+        .where((path) => path.isNotEmpty)
+        .toList(growable: false);
     final loaded = <VideoModel>[];
-    for (final entry in uniquePaths.asMap().entries) {
-      final path = entry.value;
-      final id = _stableLocalVideoId(path);
-      final state = await _interactionService.load(id);
-      loaded.add(VideoModel(
-        id: id,
-        userId: 'local_user',
-        user: user,
-        videoUrl: path,
-        caption: path.split(RegExp(r'[/\\]')).last,
-        likesCount: _int(state['likesCount']),
-        sharesCount: _int(state['sharesCount']),
-        viewsCount: _int(state['viewsCount']),
-        savesCount: _int(state['savesCount']),
-        isLiked: state['isLiked'] == true,
-        isSaved: state['isSaved'] == true,
-        isFollowing: state['isFollowing'] == true,
-        duration: '—',
-        quality: 'محلي',
-        aspectRatio: 9 / 16,
-        createdAt: DateTime.now().subtract(Duration(minutes: entry.key)),
-      ));
+
+    // Keep preference reads bounded so a large SD-card library does not
+    // serialize hundreds of disk reads or create an unbounded burst.
+    const batchSize = 16;
+    for (var start = 0; start < uniquePaths.length; start += batchSize) {
+      final end = (start + batchSize).clamp(0, uniquePaths.length);
+      final batch = uniquePaths.sublist(start, end);
+      final states = await Future.wait(
+        batch.map(
+          (path) => _interactionService.load(_stableLocalVideoId(path)),
+        ),
+      );
+
+      for (var offset = 0; offset < batch.length; offset++) {
+        final path = batch[offset];
+        final state = states[offset];
+        final id = _stableLocalVideoId(path);
+        loaded.add(VideoModel(
+          id: id,
+          userId: 'local_user',
+          user: user,
+          videoUrl: path,
+          caption: path.split(RegExp(r'[/\\]')).last,
+          likesCount: _int(state['likesCount']),
+          sharesCount: _int(state['sharesCount']),
+          viewsCount: _int(state['viewsCount']),
+          savesCount: _int(state['savesCount']),
+          isLiked: state['isLiked'] == true,
+          isSaved: state['isSaved'] == true,
+          isFollowing: state['isFollowing'] == true,
+          duration: '—',
+          quality: 'محلي',
+          aspectRatio: 9 / 16,
+          createdAt: DateTime.now().subtract(
+            Duration(minutes: start + offset),
+          ),
+        ));
+      }
     }
+
     _allVideos = loaded;
     _applyFilterAndSort(notify: false);
     if (_videos.isEmpty) {
