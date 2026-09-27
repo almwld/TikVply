@@ -43,6 +43,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Duration? _a;
   Duration? _b;
   int? _sleepMinutes;
+  final Object _mediaOwner = Object();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -61,7 +62,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (widget.isActive != oldWidget.isActive) {
       final c = _controller;
       if (widget.isActive) {
-        MediaPlaybackService.setActiveHandler(_handleMediaAction);
+        MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
         if (c == null || !c.value.isInitialized) {
           _open();
         } else if (settings.autoplay && !c.value.isPlaying) {
@@ -441,7 +442,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     c?.removeListener(_listener);
     c?.dispose();
     if (widget.isActive) {
-      MediaPlaybackService.setActiveHandler(null);
+      MediaPlaybackService.clearActiveHandler(_mediaOwner);
       MediaPlaybackService.stop();
     }
     WakelockPlus.disable();
