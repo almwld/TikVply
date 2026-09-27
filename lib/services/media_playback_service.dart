@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 class MediaPlaybackService {
   static const MethodChannel _channel = MethodChannel('com.tikvply/media');
   static Future<void> Function(String action)? _activeHandler;
+  static Object? _activeOwner;
   static bool _handlerInstalled = false;
   static final List<String> _pendingActions = <String>[];
 
@@ -27,8 +28,9 @@ class MediaPlaybackService {
     });
   }
 
-  static void setActiveHandler(Future<void> Function(String action)? handler) {
+  static void setActiveHandler(Future<void> Function(String action)? handler, {Object? owner}) {
     _activeHandler = handler;
+    _activeOwner = owner;
     if (handler == null || _pendingActions.isEmpty) return;
     final actions = List<String>.from(_pendingActions);
     _pendingActions.clear();
@@ -61,6 +63,12 @@ class MediaPlaybackService {
     try {
       await _channel.invokeMethod('updateMedia', {'playing': playing});
     } catch (_) {}
+  }
+
+  static void clearActiveHandler(Object owner) {
+    if (_activeOwner != owner) return;
+    _activeHandler = null;
+    _activeOwner = null;
   }
 
   static Future<void> stop() async {
