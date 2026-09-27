@@ -44,6 +44,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Duration? _b;
   int? _sleepMinutes;
   final Object _mediaOwner = Object();
+  int _openGeneration = 0;
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -102,6 +103,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   Future<void> _open() async {
+    final generation = ++_openGeneration;
     // PageView can build neighboring pages. Only the visible page may
     // initialize a decoder; inactive pages release their decoder entirely.
     if (!widget.isActive) {
@@ -111,7 +113,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         previous.removeListener(_listener);
         await previous.dispose();
       }
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _openGeneration) setState(() => _loading = false);
       return;
     }
 
@@ -123,7 +125,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       previous.removeListener(_listener);
       await previous.dispose();
     }
-    if (mounted) setState(() => _loading = true);
+    if (mounted && generation == _openGeneration) setState(() => _loading = true);
     try {
       final controller = _network
           ? VideoPlayerController.networkUrl(
@@ -151,10 +153,15 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (saved != null && saved > Duration.zero && saved < controller.value.duration - const Duration(seconds: 2)) {
         await controller.seekTo(saved);
       }
-      if (!mounted) return;
+      if (!mounted || generation != _openGeneration || !widget.isActive) {
+        controller.removeListener(_listener);
+        await controller.dispose();
+        if (identical(_controller, controller)) _controller = null;
+        return;
+      }
       setState(() => _loading = false);
-      if (widget.isActive) MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
-      if (settings.autoplay && widget.isActive) {
+      MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+      if (settings.autoplay) {
         await controller.play();
         _lastPlaying = true;
         await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
@@ -167,7 +174,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     } catch (error, stack) {
       debugPrint('TikVply player open failed: $error');
       debugPrintStack(stackTrace: stack);
-      if (!mounted) return;
+      if (!mounted || generation != _openGeneration) return;
       setState(() => _loading = false);
       // No error screen: unreadable media is skipped silently when a next item exists.
       if (widget.onCompleted != null) {
