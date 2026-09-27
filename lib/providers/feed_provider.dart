@@ -8,6 +8,17 @@ import '../services/media_playback_service.dart';
 import '../services/video_playback_state_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+String _stableLocalVideoId(String path) {
+  // FNV-1a keeps the identifier deterministic across app launches/platforms;
+  // Dart's Object.hash/hashCode is not a durable persistence key.
+  var hash = 0xcbf29ce484222325;
+  for (final unit in path.codeUnits) {
+    hash ^= unit;
+    hash = (hash * 0x100000001b3) & 0xffffffffffffffff;
+  }
+  return 'local_${hash.toRadixString(16).padLeft(16, '0')}';
+}
+
 enum VideoSort { newest, oldest, duration }
 
 class VideoProvider extends ChangeNotifier {
@@ -97,7 +108,7 @@ class VideoProvider extends ChangeNotifier {
     final loaded = <VideoModel>[];
     for (final entry in uniquePaths.asMap().entries) {
       final path = entry.value;
-      final id = 'local_${path.hashCode}';
+      final id = _stableLocalVideoId(path);
       final state = await _interactionService.load(id);
       loaded.add(VideoModel(
         id: id,
