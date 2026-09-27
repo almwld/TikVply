@@ -16,6 +16,8 @@ class VideoThumbnailService {
   final List<_ThumbnailJob> _queue = <_ThumbnailJob>[];
   int _active = 0;
   static const int _maxActive = 1;
+  static const int _maxCachedFiles = 160;
+  int _generatedSinceCleanup = 0;
 
   Future<Directory> _directory() async {
     final existing = _cacheDirectory;
@@ -77,10 +79,40 @@ class VideoThumbnailService {
         if (await thumbnail.exists()) await thumbnail.delete();
         await generatedFile.rename(thumbnail.path);
       }
+      _generatedSinceCleanup++;
+      if (_generatedSinceCleanup >= 24) {
+        _generatedSinceCleanup = 0;
+        unawaited(_cleanupCache(directory));
+      }
       return thumbnail.path;
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _cleanupCache(Directory directory) async {
+    try {
+      final files = await directory
+          .list()
+          .where((entity) => entity is File && entity.path.toLowerCase().endsWith('.jpg'))
+          .cast<File>()
+          .toList();
+      if (files.length <= _maxCachedFiles) return;
+
+      final entries = <File, DateTime>{};
+      for (final file in files) {
+        try {
+          entries[file] = (await file.stat()).modified;
+        } catch (_) {}
+      }
+      final ordered = entries.keys.toList()
+        ..sort((a, b) => entries[b]!.compareTo(entries[a]!));
+      for (final file in ordered.skip(_maxCachedFiles)) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 }
 
