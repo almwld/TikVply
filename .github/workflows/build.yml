@@ -395,6 +395,9 @@ jobs:
       - name: Static analysis
         run: flutter analyze --no-fatal-infos
 
+      - name: 🧪 Run Flutter tests
+        run: flutter test
+
       - name: Verify repository assets
         run: |
           test -d assets/images
