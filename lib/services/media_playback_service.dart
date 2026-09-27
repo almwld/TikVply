@@ -65,10 +65,14 @@ class MediaPlaybackService {
     } catch (_) {}
   }
 
-  static void clearActiveHandler(Object owner) {
-    if (_activeOwner != owner) return;
+  /// Clears the active owner only when [owner] still owns the media session.
+  /// Returns true when the caller was the active owner, allowing lifecycle
+  /// cleanup to stop the native service without racing a newer page.
+  static bool clearActiveHandler(Object owner) {
+    if (_activeOwner != owner) return false;
     _activeHandler = null;
     _activeOwner = null;
+    return true;
   }
 
   static Future<void> stop({Object? owner}) async {
