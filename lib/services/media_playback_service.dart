@@ -71,7 +71,8 @@ class MediaPlaybackService {
     _activeOwner = null;
   }
 
-  static Future<void> stop() async {
+  static Future<void> stop({Object? owner}) async {
+    if (owner != null && _activeOwner != owner) return;
     try { await _channel.invokeMethod('stopMedia'); } catch (_) {}
   }
 
