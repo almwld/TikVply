@@ -195,14 +195,15 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
           const SizedBox(height: 18),
           FilledButton.icon(onPressed: () => _refreshIfNeeded(force: true), icon: const Icon(Icons.sync), label: const Text('تحديث المكتبة')),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await PhotoManager.presentLimited(type: RequestType.video);
-              if (mounted) await _refreshIfNeeded(force: true);
-            },
-            icon: const Icon(Icons.video_library_outlined),
-            label: const Text('إدارة الفيديوهات المسموح بها'),
-          ),
+          if (provider.permissionLimited)
+            OutlinedButton.icon(
+              onPressed: () async {
+                await PhotoManager.presentLimited(type: RequestType.video);
+                if (mounted) await _refreshIfNeeded(force: true);
+              },
+              icon: const Icon(Icons.video_library_outlined),
+              label: const Text('إدارة الفيديوهات المسموح بها'),
+            ),
         ],
       ]),
     ),
