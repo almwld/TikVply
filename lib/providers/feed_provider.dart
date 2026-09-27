@@ -30,6 +30,7 @@ class VideoProvider extends ChangeNotifier {
   bool get isRefreshing => _isRefreshing;
   String? get error => _error;
   bool get hasVideos => _videos.isNotEmpty;
+  bool get permissionLimited => _deviceMediaService.permissionLimited;
   String get query => _query;
   VideoSort get sort => _sort;
 
@@ -64,7 +65,7 @@ class VideoProvider extends ChangeNotifier {
     _error = null;
     if (notify) notifyListeners();
     try {
-      final oldPaths = List<String>.from(_allVideos.map((v) => v.videoUrl));
+      final oldPaths = _allVideos.map((v) => v.videoUrl).toSet();
       final paths = await _deviceMediaService.scanAllVideos();
       if (_deviceMediaService.permissionDenied) {
         _error = 'يحتاج TikVply إلى إذن الوصول إلى فيديوهات الهاتف';
@@ -123,7 +124,7 @@ class VideoProvider extends ChangeNotifier {
 
   static int _int(dynamic value) => value is num ? value.toInt() : 0;
 
-  Future<void> _notifyAboutNewVideos(List<String> oldPaths, List<String> newPaths) async {
+  Future<void> _notifyAboutNewVideos(Set<String> oldPaths, List<String> newPaths) async {
     if (oldPaths.isEmpty || newPaths.isEmpty) return;
 
     // Notify only for newly discovered videos that the user has not watched.
