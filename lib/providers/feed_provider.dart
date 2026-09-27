@@ -148,7 +148,7 @@ class VideoProvider extends ChangeNotifier {
     var unseenAdded = 0;
     for (final path in newPaths) {
       if (oldPaths.contains(path)) continue;
-      final id = 'local_${path.hashCode}';
+      final id = _stableLocalVideoId(path);
       if (!await playbackState.isWatched(id)) {
         unseenAdded++;
       }
