@@ -4,12 +4,16 @@ import 'package:photo_manager/photo_manager.dart';
 
 class DeviceMediaService {
   bool _permissionDenied = false;
+  bool _permissionLimited = false;
 
   bool get permissionDenied => _permissionDenied;
+  bool get permissionLimited => _permissionLimited;
 
   Future<List<String>> scanAllVideos() async {
     _permissionDenied = false;
+    _permissionLimited = false;
     final permission = await PhotoManager.requestPermissionExtend();
+    _permissionLimited = permission.isLimited;
     if (!permission.isAuth && !permission.hasAccess) {
       _permissionDenied = true;
       return const <String>[];
