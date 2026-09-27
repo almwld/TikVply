@@ -71,6 +71,11 @@ class VideoProvider extends ChangeNotifier {
         _error = 'يحتاج TikVply إلى إذن الوصول إلى فيديوهات الهاتف';
         return;
       }
+      final newPaths = paths.toSet();
+      if (newPaths.length == oldPaths.length && newPaths.containsAll(oldPaths)) {
+        return;
+      }
+
       await _localVideoService.replacePaths(paths);
       await _setVideos(paths);
       await _notifyAboutNewVideos(oldPaths, paths);
