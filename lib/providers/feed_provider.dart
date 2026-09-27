@@ -113,7 +113,7 @@ class VideoProvider extends ChangeNotifier {
     // serialize hundreds of disk reads or create an unbounded burst.
     const batchSize = 16;
     for (var start = 0; start < uniquePaths.length; start += batchSize) {
-      final end = (start + batchSize).clamp(0, uniquePaths.length);
+      final end = (start + batchSize).clamp(0, uniquePaths.length).toInt();
       final batch = uniquePaths.sublist(start, end);
       final states = await Future.wait(
         batch.map(
