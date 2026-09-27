@@ -441,9 +441,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
-    if (widget.isActive) {
-      MediaPlaybackService.clearActiveHandler(_mediaOwner);
-      MediaPlaybackService.stop(owner: _mediaOwner);
+    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
+      MediaPlaybackService.stop();
     }
     WakelockPlus.disable();
     if (_fullscreen) {
