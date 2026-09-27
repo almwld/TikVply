@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -57,7 +56,8 @@ class VideoThumbnailService {
       if (!await video.exists()) return null;
 
       final directory = await _directory();
-      final key = videoPath.hashCode.toRadixString(16);
+      final stat = await video.stat();
+      final key = '${videoPath.hashCode.toRadixString(16)}_${stat.size}_${stat.modified.millisecondsSinceEpoch}';
       final thumbnail = File('${directory.path}/$key.jpg');
       if (await thumbnail.exists() && await thumbnail.length() > 0) return thumbnail.path;
 
