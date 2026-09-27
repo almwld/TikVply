@@ -41,9 +41,10 @@ class DeviceMediaService {
         if (assets.isEmpty) break;
 
         for (final asset in assets) {
-          // Prefer the original file so removable-storage videos retain
-          // their native format and remain playable by video_player.
-          final file = await asset.originFile ?? await asset.file;
+          // Use the regular MediaStore file first. It is substantially cheaper
+          // for large libraries; fall back to the original only when needed
+          // for removable-storage providers that do not expose a direct file. 
+          final file = await asset.file ?? await asset.originFile;
           if (file != null && await file.exists()) {
             all.add(file.path);
           }
