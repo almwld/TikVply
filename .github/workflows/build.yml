@@ -398,6 +398,9 @@ jobs:
       - name: 🧪 Run Flutter tests
         run: flutter test
 
+      - name: 🎨 Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
       - name: Verify repository assets
         run: |
           test -d assets/images
