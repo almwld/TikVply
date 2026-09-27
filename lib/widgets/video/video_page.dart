@@ -153,7 +153,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       setState(() => _loading = false);
-      if (widget.isActive) MediaPlaybackService.setActiveHandler(_handleMediaAction);
+      if (widget.isActive) MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
       if (settings.autoplay && widget.isActive) {
         await controller.play();
         _lastPlaying = true;
@@ -443,7 +443,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     c?.dispose();
     if (widget.isActive) {
       MediaPlaybackService.clearActiveHandler(_mediaOwner);
-      MediaPlaybackService.stop();
+      MediaPlaybackService.stop(owner: _mediaOwner);
     }
     WakelockPlus.disable();
     if (_fullscreen) {
