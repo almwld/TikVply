@@ -72,13 +72,21 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
         }
       } else {
-        if (c != null && c.value.isInitialized) {
+        // Invalidate any in-flight decoder initialization immediately when
+        // PageView moves this item off-screen. This prevents a late
+        // initialize() completion from reviving an inactive page.
+        _openGeneration++;
+        if (MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
+          MediaPlaybackService.stop();
+        }
+        if (c != null) {
           c.pause();
-          _savePosition(c.value.position);
+          if (c.value.isInitialized) _savePosition(c.value.position);
           c.removeListener(_listener);
           c.dispose();
           _controller = null;
         }
+        _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
