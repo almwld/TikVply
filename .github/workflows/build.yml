@@ -402,7 +402,27 @@ jobs:
           test -f assets/icons/svg/tikvply_logo.svg
 
       - name: Build TikVply release APKs
-        run: flutter build apk --release --split-per-abi
+        run: |
+          set -euo pipefail
+          flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
+          test -s build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -s build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          test -s build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+      - name: Build Play Store App Bundle
+        run: |
+          set -euo pipefail
+          flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+          test -s build/app/outputs/bundle/release/app-release.aab
+
+      - name: Verify release outputs
+        run: |
+          set -euo pipefail
+          echo 'Release artifacts:'
+          du -h build/app/outputs/flutter-apk/*.apk
+          du -h build/app/outputs/bundle/release/app-release.aab
+          test -d build/symbols
+          find build/symbols -type f -maxdepth 2 -print
 
       - name: 📤 Upload arm64-v8a
         uses: actions/upload-artifact@v4
@@ -423,4 +443,18 @@ jobs:
         with:
           name: app-x86_64
           path: build/app/outputs/flutter-apk/app-x86_64-release.apk
+          retention-days: 30
+
+      - name: 📤 Upload Play Store AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: tikvply-playstore-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: 📤 Upload Dart obfuscation symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: tikvply-symbols
+          path: build/symbols
           retention-days: 30
