@@ -259,6 +259,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Only the visible PageView item owns playback and the media notification.
+    // Neighboring pages stay mounted for smooth paging, so lifecycle callbacks
+    // must never resurrect a decoder or notification for an inactive item.
+    if (!widget.isActive) return;
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
