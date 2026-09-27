@@ -43,7 +43,7 @@ class DeviceMediaService {
         for (final asset in assets) {
           // Use the regular MediaStore file first. It is substantially cheaper
           // for large libraries; fall back to the original only when needed
-          // for removable-storage providers that do not expose a direct file. 
+          // for removable-storage providers that do not expose a direct file.
           final file = await asset.file ?? await asset.originFile;
           if (file != null && await file.exists()) {
             all.add(file.path);
