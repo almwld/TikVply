@@ -70,9 +70,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           unawaited(_resumeActiveController(c));
         }
       } else {
-        // Invalidate any in-flight decoder initialization immediately when
-        // PageView moves this item off-screen. This prevents a late
-        // initialize() completion from reviving an inactive page.
         _openGeneration++;
         if (MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
           MediaPlaybackService.stop();
@@ -95,22 +92,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!mounted || !widget.isActive || !c.value.isInitialized) return;
     await c.play();
     if (!mounted || !widget.isActive || !identical(_controller, c)) return;
-    _lastPlaying = true;
+    _lastPlaying = c.value.isPlaying;
     await _syncWakelock();
-    await MediaPlaybackService.start(
-      title: widget.video.caption ?? 'TikVply',
-      playing: true,
-    );
+    await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying);
   }
 
   Future<void> _handleMediaAction(String action) async {
     if (!widget.isActive || !mounted) return;
     switch (action) {
       case 'toggle':
-        _togglePlay();
+        await _togglePlay();
         break;
       case 'play':
-        _playOnly();
+        await _playOnly();
         break;
       case 'next':
         widget.onCompleted?.call();
@@ -122,8 +116,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   Future<void> _open() async {
     final generation = ++_openGeneration;
-    // PageView can build neighboring pages. Only the visible page may
-    // initialize a decoder; inactive pages release their decoder entirely.
     if (!widget.isActive) {
       final previous = _controller;
       _controller = null;
@@ -146,31 +138,15 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (mounted && generation == _openGeneration) setState(() => _loading = true);
     try {
       final controller = _network
-          ? VideoPlayerController.networkUrl(
-              Uri.parse(widget.video.videoUrl),
-              videoPlayerOptions: VideoPlayerOptions(
-                allowBackgroundPlayback: true,
-                mixWithOthers: false,
-              ),
-            )
-          : VideoPlayerController.file(
-              File(widget.video.videoUrl),
-              videoPlayerOptions: VideoPlayerOptions(
-                allowBackgroundPlayback: true,
-                mixWithOthers: false,
-              ),
-            );
+          ? VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false))
+          : VideoPlayerController.file(File(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false));
       _controller = controller;
       controller.addListener(_listener);
       await controller.initialize();
-      if (!controller.value.isInitialized || controller.value.duration <= Duration.zero) {
-        throw StateError('invalid video');
-      }
+      if (!controller.value.isInitialized || controller.value.duration <= Duration.zero) throw StateError('invalid video');
       await _applySettings();
       final saved = await _playback.loadPosition(widget.video.id);
-      if (saved != null && saved > Duration.zero && saved < controller.value.duration - const Duration(seconds: 2)) {
-        await controller.seekTo(saved);
-      }
+      if (saved != null && saved > Duration.zero && saved < controller.value.duration - const Duration(seconds: 2)) await controller.seekTo(saved);
       if (!mounted || generation != _openGeneration || !widget.isActive) {
         controller.removeListener(_listener);
         await controller.dispose();
@@ -181,9 +157,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
       if (settings.autoplay) {
         await controller.play();
-        _lastPlaying = true;
+        _lastPlaying = controller.value.isPlaying;
         await _syncWakelock();
-        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying);
       }
       _startSaving();
       _scheduleHide();
@@ -195,7 +171,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       debugPrintStack(stackTrace: stack);
       if (!mounted || generation != _openGeneration) return;
       setState(() => _loading = false);
-      // No error screen: unreadable media is skipped silently when a next item exists.
       if (widget.onCompleted != null) {
         Future<void>.delayed(const Duration(milliseconds: 180), () {
           if (mounted && !_completionSent) {
@@ -210,9 +185,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void _listener() {
     final c = _controller;
     if (c == null || !mounted || !c.value.isInitialized) return;
-    if (c.value.isInitialized && c.value.duration > Duration.zero && c.value.position >= c.value.duration * 0.8) {
-      _playback.markWatched(widget.video.id);
-    }
+    if (c.value.duration > Duration.zero && c.value.position >= c.value.duration * 0.8) _playback.markWatched(widget.video.id);
     if (c.value.isPlaying != _lastPlaying) {
       _lastPlaying = c.value.isPlaying;
       unawaited(_syncWakelock());
@@ -240,10 +213,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   Future<void> _syncWakelock() async {
     final c = _controller;
-    if (c != null &&
-        c.value.isInitialized &&
-        c.value.isPlaying &&
-        settings.keepScreenAwake) {
+    if (c != null && c.value.isInitialized && c.value.isPlaying && settings.keepScreenAwake) {
       await WakelockPlus.enable();
     } else {
       await WakelockPlus.disable();
@@ -265,9 +235,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _saveTimer?.cancel();
     _saveTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       final c = _controller;
-      if (c != null && c.value.isInitialized && c.value.isPlaying) {
-        _savePosition(c.value.position);
-      }
+      if (c != null && c.value.isInitialized && c.value.isPlaying) _savePosition(c.value.position);
     });
   }
 
@@ -279,20 +247,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Only the visible PageView item owns playback and the media notification.
-    // Neighboring pages stay mounted for smooth paging, so lifecycle callbacks
-    // must never resurrect a decoder or notification for an inactive item.
     if (!widget.isActive) return;
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _savePosition(c.value.position);
-      // Do not pause here. video_player is explicitly configured with
-      // allowBackgroundPlayback so audio/video continues when the app is
-      // backgrounded or the status bar is pulled down.
-      if (c.value.isPlaying && settings.mediaNotifications) {
-        MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
-      }
+      if (c.value.isPlaying && settings.mediaNotifications) MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
       unawaited(_syncWakelock());
     } else if (state == AppLifecycleState.resumed) {
       unawaited(_syncWakelock());
@@ -301,11 +261,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   Future<void> _playOnly() async {
     final c = _controller;
-    if (_locked || c == null || !c.value.isInitialized) return;
+    if (_locked || c == null || !c.value.isInitialized || !widget.isActive) return;
     if (!c.value.isPlaying) await c.play();
-    _lastPlaying = true;
-    await MediaPlaybackService.update(playing: true);
+    if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+    _lastPlaying = c.value.isPlaying;
     await _syncWakelock();
+    await MediaPlaybackService.update(playing: _lastPlaying);
     if (mounted) {
       setState(() => _showControls = true);
       _scheduleHide();
@@ -314,18 +275,16 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   Future<void> _togglePlay() async {
     final c = _controller;
-    if (_locked || c == null || !c.value.isInitialized) return;
+    if (_locked || c == null || !c.value.isInitialized || !widget.isActive) return;
     if (c.value.isPlaying) {
-      c.pause();
-      _lastPlaying = false;
-      MediaPlaybackService.update(playing: false);
-      await _syncWakelock();
+      await c.pause();
     } else {
-      c.play();
-      _lastPlaying = true;
-      MediaPlaybackService.update(playing: true);
-      await _syncWakelock();
+      await c.play();
     }
+    if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+    _lastPlaying = c.value.isPlaying;
+    await _syncWakelock();
+    await MediaPlaybackService.update(playing: _lastPlaying);
     setState(() => _showControls = true);
     _scheduleHide();
   }
@@ -393,8 +352,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (!available) return;
       await _platform.invokeMethod('enterPip');
       await _controller?.play();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   void _lock() {
@@ -480,9 +438,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
-    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
-      MediaPlaybackService.stop();
-    }
+    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) MediaPlaybackService.stop();
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -494,22 +450,13 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.black,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
+      value: const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light, statusBarBrightness: Brightness.dark, systemNavigationBarColor: Colors.black, systemNavigationBarIconBrightness: Brightness.light),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_loading || _controller == null || !_controller!.value.isInitialized)
-              const _VideoLoadingShimmer()
-            else
-              _video(),
+            if (_loading || _controller == null || !_controller!.value.isInitialized) const _VideoLoadingShimmer() else _video(),
             if (!_loading && _controller != null && _controller!.value.isInitialized && !_locked) _controls(),
             if (_locked)
               Positioned(
@@ -531,9 +478,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       behavior: HitTestBehavior.opaque,
       onTap: _tap,
       onDoubleTapDown: _doubleTap,
-      onScaleStart: (_) {
-        _scaleBase = _zoom;
-      },
+      onScaleStart: (_) => _scaleBase = _zoom,
       onScaleUpdate: (details) {
         if (details.pointerCount < 2) return;
         final next = (_scaleBase * details.scale).clamp(1.0, 3.0).toDouble();
@@ -562,8 +507,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               child: Transform.scale(
                 scale: _zoom,
                 child: FittedBox(
-                fit: fit,
-                clipBehavior: Clip.hardEdge,
+                  fit: fit,
+                  clipBehavior: Clip.hardEdge,
                   child: SizedBox(width: value.size.width, height: value.size.height, child: VideoPlayer(c)),
                 ),
               ),
@@ -610,11 +555,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                   child: Material(
                     color: Colors.black54,
                     shape: const CircleBorder(),
-                    child: IconButton(
-                      tooltip: 'إعادة حجم الفيديو',
-                      onPressed: () => setState(() => _zoom = 1.0),
-                      icon: const Icon(Icons.fit_screen_rounded, color: Colors.white),
-                    ),
+                    child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: () => setState(() => _zoom = 1.0), icon: const Icon(Icons.fit_screen_rounded, color: Colors.white)),
                   ),
                 ),
               ]
@@ -626,17 +567,15 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
             bottom: MediaQuery.paddingOf(context).bottom + 12,
             child: ValueListenableBuilder<VideoPlayerValue>(
               valueListenable: _controller!,
-              builder: (_, value, __) {
-                return Row(
-                  children: [
-                    IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
-                    IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seek(-settings.skipSeconds)),
-                    Expanded(child: VideoProgressIndicator(_controller!, allowScrubbing: true, padding: const EdgeInsets.symmetric(horizontal: 4), colors: const VideoProgressColors(playedColor: AppColors.primary, bufferedColor: Colors.white38, backgroundColor: Colors.white24))),
-                    IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seek(settings.skipSeconds)),
-                    IconButton(icon: Icon(value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white), onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0)),
-                  ],
-                );
-              },
+              builder: (_, value, __) => Row(
+                children: [
+                  IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
+                  IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seek(-settings.skipSeconds)),
+                  Expanded(child: VideoProgressIndicator(_controller!, allowScrubbing: true, padding: const EdgeInsets.symmetric(horizontal: 4), colors: const VideoProgressColors(playedColor: AppColors.primary, bufferedColor: Colors.white38, backgroundColor: Colors.white24))),
+                  IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seek(settings.skipSeconds)),
+                  IconButton(icon: Icon(value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white), onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0)),
+                ],
+              ),
             ),
           ),
       ],
@@ -658,7 +597,7 @@ class _SmallAction extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 4), Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700))]),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 4), Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)]),
           ),
         ),
       );
@@ -667,18 +606,11 @@ class _SmallAction extends StatelessWidget {
 class _TopGradient extends StatelessWidget {
   const _TopGradient();
   @override
-  Widget build(BuildContext context) => Container(
-        height: 140,
-        decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])),
-      );
+  Widget build(BuildContext context) => Container(height: 140, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])));
 }
 
 class _VideoLoadingShimmer extends StatelessWidget {
   const _VideoLoadingShimmer();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(
-        baseColor: const Color(0xFF101817),
-        highlightColor: const Color(0xFF2B3836),
-        child: const ColoredBox(color: Color(0xFF171F1E)),
-      );
+  Widget build(BuildContext context) => Shimmer.fromColors(baseColor: const Color(0xFF101817), highlightColor: const Color(0xFF2B3836), child: const ColoredBox(color: Color(0xFF171F1E)));
 }
