@@ -67,10 +67,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         if (c == null || !c.value.isInitialized) {
           _open();
         } else if (settings.autoplay && !c.value.isPlaying) {
-          await c.play();
-          _lastPlaying = true;
-          await _syncWakelock();
-          await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+          unawaited(_resumeActiveController(c));
         }
       } else {
         // Invalidate any in-flight decoder initialization immediately when
@@ -92,6 +89,18 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         if (mounted) setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _resumeActiveController(VideoPlayerController c) async {
+    if (!mounted || !widget.isActive || !c.value.isInitialized) return;
+    await c.play();
+    if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+    _lastPlaying = true;
+    await _syncWakelock();
+    await MediaPlaybackService.start(
+      title: widget.video.caption ?? 'TikVply',
+      playing: true,
+    );
   }
 
   Future<void> _handleMediaAction(String action) async {
@@ -269,7 +278,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   @override
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Only the visible PageView item owns playback and the media notification.
     // Neighboring pages stay mounted for smooth paging, so lifecycle callbacks
@@ -285,9 +293,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (c.value.isPlaying && settings.mediaNotifications) {
         MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
       }
-      await _syncWakelock();
+      unawaited(_syncWakelock());
     } else if (state == AppLifecycleState.resumed) {
-      await _syncWakelock();
+      unawaited(_syncWakelock());
     }
   }
 
