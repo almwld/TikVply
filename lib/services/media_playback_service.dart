@@ -8,6 +8,7 @@ class MediaPlaybackService {
   static Future<void> Function(String action)? _activeHandler;
   static Object? _activeOwner;
   static bool _handlerInstalled = false;
+  static Future<void> _actionQueue = Future<void>.value();
   static final List<String> _pendingActions = <String>[];
 
   static void initialize() {
@@ -16,14 +17,7 @@ class MediaPlaybackService {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'mediaAction') {
         final action = call.arguments?.toString() ?? 'open';
-        final handler = _activeHandler;
-        if (handler != null) {
-          await handler(action);
-        } else {
-          _pendingActions
-            ..clear()
-            ..add(action);
-        }
+        _enqueueAction(action);
       }
     });
   }
@@ -32,14 +26,24 @@ class MediaPlaybackService {
     _activeHandler = handler;
     _activeOwner = owner;
     if (handler == null || _pendingActions.isEmpty) return;
-    final activeHandler = handler;
     final actions = List<String>.from(_pendingActions);
     _pendingActions.clear();
     for (final action in actions) {
-      Future<void>.microtask(() async {
-        await activeHandler(action);
-      });
+      _enqueueAction(action);
     }
+  }
+
+  static void _enqueueAction(String action) {
+    _actionQueue = _actionQueue.then((_) async {
+      final handler = _activeHandler;
+      if (handler != null) {
+        await handler(action);
+      } else {
+        _pendingActions
+          ..clear()
+          ..add(action);
+      }
+    }).catchError((_) {});
   }
 
   static Future<void> requestNotificationPermission() async {
