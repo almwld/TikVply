@@ -37,6 +37,7 @@ class SettingsScreen extends StatelessWidget {
               _switch(Icons.gesture_rounded, 'إيماءات التحكم', 'السحب والتقديم والتحكم بالصوت والسطوع', video.gesturesEnabled, video.setGesturesEnabled),
               _switch(Icons.notifications_active_outlined, 'إشعارات الوسائط', 'التحكم من إشعارات النظام', video.mediaNotifications, video.setMediaNotifications),
               _switch(Icons.brightness_5_outlined, 'إبقاء الشاشة مضاءة', 'أثناء المشاهدة', video.keepScreenAwake, video.setKeepScreenAwake),
+              _switch(Icons.headphones_outlined, 'التشغيل في الخلفية', 'استمر في تشغيل الفيديو عند مغادرة التطبيق أو قفل الشاشة', video.backgroundPlayback, video.setBackgroundPlayback),
               ListTile(leading: const Icon(Icons.speed, color: AppColors.primary), title: const Text('سرعة التشغيل'), subtitle: Text('${video.playbackSpeed}x'), trailing: const Icon(Icons.chevron_left), onTap: () => _speedPicker(context, video)),
               ListTile(leading: const Icon(Icons.fast_forward_rounded, color: AppColors.primary), title: const Text('مقدار التقديم والرجوع'), subtitle: Text('${video.skipSeconds} ثوانٍ'), trailing: const Icon(Icons.chevron_left), onTap: () => _skipPicker(context, video)),
               ListTile(leading: const Icon(Icons.aspect_ratio_outlined, color: AppColors.primary), title: const Text('طريقة العرض'), subtitle: Text(_fitLabel(video.fitMode)), trailing: const Icon(Icons.chevron_left), onTap: () => _fitPicker(context, video)),
