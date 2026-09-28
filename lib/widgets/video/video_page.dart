@@ -172,6 +172,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (settings.autoplay) {
         await controller.play();
         _lastPlaying = true;
+        await _syncWakelock();
         await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
       }
       _startSaving();
@@ -226,6 +227,18 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _syncWakelock() async {
+    final c = _controller;
+    if (c != null &&
+        c.value.isInitialized &&
+        c.value.isPlaying &&
+        settings.keepScreenAwake) {
+      await WakelockPlus.enable();
+    } else {
+      await WakelockPlus.disable();
+    }
+  }
+
   Future<void> _applySettings() async {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
@@ -233,11 +246,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await c.setLooping(settings.loop);
       await c.setVolume(settings.muted ? 0 : c.value.volume);
       await c.setPlaybackSpeed(settings.playbackSpeed);
-      if (settings.keepScreenAwake && c.value.isPlaying) {
-        await WakelockPlus.enable();
-      } else {
-        await WakelockPlus.disable();
-      }
+      await _syncWakelock();
     } catch (_) {}
   }
 
@@ -273,9 +282,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (c.value.isPlaying && settings.mediaNotifications) {
         MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
       }
-      WakelockPlus.disable();
-    } else if (state == AppLifecycleState.resumed && c.value.isPlaying && settings.keepScreenAwake) {
-      WakelockPlus.enable();
+      await _syncWakelock();
+    } else if (state == AppLifecycleState.resumed) {
+      await _syncWakelock();
     }
   }
 
@@ -285,7 +294,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!c.value.isPlaying) await c.play();
     _lastPlaying = true;
     await MediaPlaybackService.update(playing: true);
-    if (settings.keepScreenAwake) await WakelockPlus.enable();
+    await _syncWakelock();
     if (mounted) {
       setState(() => _showControls = true);
       _scheduleHide();
@@ -299,12 +308,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       c.pause();
       _lastPlaying = false;
       MediaPlaybackService.update(playing: false);
-      WakelockPlus.disable();
+      await _syncWakelock();
     } else {
       c.play();
       _lastPlaying = true;
       MediaPlaybackService.update(playing: true);
-      if (settings.keepScreenAwake) WakelockPlus.enable();
+      await _syncWakelock();
     }
     setState(() => _showControls = true);
     _scheduleHide();
