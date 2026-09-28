@@ -67,9 +67,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         if (c == null || !c.value.isInitialized) {
           _open();
         } else if (settings.autoplay && !c.value.isPlaying) {
-          c.play();
+          await c.play();
           _lastPlaying = true;
-          MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+          await _syncWakelock();
+          await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
         }
       } else {
         // Invalidate any in-flight decoder initialization immediately when
@@ -205,7 +206,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
     if (c.value.isPlaying != _lastPlaying) {
       _lastPlaying = c.value.isPlaying;
-      MediaPlaybackService.update(playing: _lastPlaying);
+      unawaited(_syncWakelock());
+      unawaited(MediaPlaybackService.update(playing: _lastPlaying));
     }
     if (c.value.hasError) {
       if (!_completionSent && widget.onCompleted != null) {
