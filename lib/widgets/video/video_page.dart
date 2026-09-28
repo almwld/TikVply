@@ -37,7 +37,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   bool _completionSent = false;
   bool _like = false;
   double _zoom = 1.0;
-  double _scaleBase = 1.0;
+  late final TransformationController _zoomController;
   bool _lastPlaying = false;
   Offset _likePosition = Offset.zero;
   Duration? _a;
@@ -54,6 +54,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _zoomController = TransformationController();
+    _zoomController.addListener(_onZoomChanged);
     settings.addListener(_applySettings);
     _open();
   }
@@ -307,8 +309,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
 
   void _tap() {
     if (_locked) return;
-    setState(() => _showControls = !_showControls);
-    if (_showControls) _scheduleHide();
+    setState(() => _showControls = true);
+    _scheduleHide();
+  }
+
+  void _onZoomChanged() {
+    if (!mounted) return;
+    final scale = _zoomController.value.getMaxScaleOnAxis().clamp(1.0, 3.0).toDouble();
+    if ((scale - _zoom).abs() > 0.01) setState(() => _zoom = scale);
+  }
+
+  void _resetZoom() {
+    _zoomController.value = Matrix4.identity();
+    if (mounted && _zoom != 1.0) setState(() => _zoom = 1.0);
   }
 
   void _scheduleHide() {
@@ -451,6 +464,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     final c = _controller;
     if (c != null && c.value.isInitialized) _savePosition(c.value.position);
     settings.removeListener(_applySettings);
+    _zoomController.removeListener(_onZoomChanged);
+    _zoomController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
@@ -494,17 +509,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       behavior: HitTestBehavior.opaque,
       onTap: _tap,
       onDoubleTapDown: _doubleTap,
-      onScaleStart: (_) => _scaleBase = _zoom,
-      onScaleUpdate: (details) {
-        if (details.pointerCount < 2) return;
-        final next = (_scaleBase * details.scale).clamp(1.0, 3.0).toDouble();
-        if ((next - _zoom).abs() > .01 && mounted) setState(() => _zoom = next);
-      },
-      onScaleEnd: (_) {
-        if (_zoom < 1.05 && mounted) setState(() => _zoom = 1.0);
-      },
       onHorizontalDragEnd: settings.gesturesEnabled
           ? (details) {
+              if (_zoom > 1.05) return;
               final velocity = details.primaryVelocity ?? 0;
               if (velocity.abs() > 300) _seek(velocity < 0 ? settings.skipSeconds : -settings.skipSeconds);
             }
@@ -519,13 +526,23 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               VideoFitMode.contain => BoxFit.contain,
               VideoFitMode.fill => BoxFit.fill,
             };
-            return SizedBox.expand(
-              child: Transform.scale(
-                scale: _zoom,
+            return InteractiveViewer(
+              transformationController: _zoomController,
+              minScale: 1.0,
+              maxScale: 3.0,
+              scaleEnabled: true,
+              panEnabled: false,
+              boundaryMargin: EdgeInsets.zero,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox.expand(
                 child: FittedBox(
                   fit: fit,
                   clipBehavior: Clip.hardEdge,
-                  child: SizedBox(width: value.size.width, height: value.size.height, child: VideoPlayer(c)),
+                  child: SizedBox(
+                    width: value.size.width,
+                    height: value.size.height,
+                    child: VideoPlayer(c),
+                  ),
                 ),
               ),
             );
@@ -571,7 +588,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                   child: Material(
                     color: Colors.black54,
                     shape: const CircleBorder(),
-                    child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: () => setState(() => _zoom = 1.0), icon: const Icon(Icons.fit_screen_rounded, color: Colors.white)),
+                    child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: _resetZoom, icon: const Icon(Icons.fit_screen_rounded, color: Colors.white)),
                   ),
                 ),
               ]
