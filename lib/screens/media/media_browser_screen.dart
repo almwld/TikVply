@@ -322,7 +322,7 @@ class _MediaViewerState extends State<_MediaViewer> {
       if (!_isScrolling && mounted) setState(() => _isScrolling = true);
     } else if (notification is ScrollEndNotification) {
       final metrics = notification.metrics;
-      final index = metrics.page?.round() ?? _activeIndex;
+      final index = _controller.hasClients ? (_controller.page?.round() ?? _activeIndex) : _activeIndex;
       if (mounted) {
         setState(() {
           _activeIndex = index.clamp(0, widget.videos.length - 1);
