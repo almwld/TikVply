@@ -652,8 +652,6 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                   IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seek(settings.skipSeconds)),
                   IconButton(icon: Icon(value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white), onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0)),
                 ],
-                  ),
-                ),
               ),
             ),
           ),
