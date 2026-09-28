@@ -137,8 +137,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await previous.dispose();
     }
     if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    VideoPlayerController? controller;
     try {
-      final controller = _network
+      controller = _network
           ? VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false))
           : VideoPlayerController.file(File(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false));
       _controller = controller;
@@ -170,6 +171,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     } catch (error, stack) {
       debugPrint('TikVply player open failed: $error');
       debugPrintStack(stackTrace: stack);
+      final failed = controller;
+      if (identical(_controller, failed)) {
+        _controller = null;
+        failed?.removeListener(_listener);
+        if (failed != null) await failed.dispose();
+      }
       if (!mounted || generation != _openGeneration) return;
       setState(() => _loading = false);
       if (widget.onCompleted != null) {
