@@ -260,7 +260,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _savePosition(c.value.position);
-      if (c.value.isPlaying && settings.mediaNotifications) MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+      // The foreground media service is already running while playback is active.
+      // Do not start it again from a background lifecycle callback, which can be
+      // rejected by newer Android foreground-service launch restrictions.
       unawaited(_syncWakelock());
     } else if (state == AppLifecycleState.resumed) {
       unawaited(_syncWakelock());
