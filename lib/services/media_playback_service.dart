@@ -32,12 +32,12 @@ class MediaPlaybackService {
     _activeHandler = handler;
     _activeOwner = owner;
     if (handler == null || _pendingActions.isEmpty) return;
+    final activeHandler = handler;
     final actions = List<String>.from(_pendingActions);
     _pendingActions.clear();
     for (final action in actions) {
       Future<void>.microtask(() async {
-        final active = _activeHandler;
-        if (active != null) await active(action);
+        await activeHandler(action);
       });
     }
   }
