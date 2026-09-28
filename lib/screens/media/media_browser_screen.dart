@@ -84,7 +84,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
               onRefresh: () => _refreshIfNeeded(force: true),
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                cacheExtent: 420,
+                scrollCacheExtent: 420,
                 slivers: [
                   SliverToBoxAdapter(child: _searchField()),
                   SliverToBoxAdapter(child: _sortRow(videos.length)),
@@ -321,7 +321,6 @@ class _MediaViewerState extends State<_MediaViewer> {
     if (notification is ScrollStartNotification) {
       if (!_isScrolling && mounted) setState(() => _isScrolling = true);
     } else if (notification is ScrollEndNotification) {
-      final metrics = notification.metrics;
       final index = _controller.hasClients ? (_controller.page?.round() ?? _activeIndex) : _activeIndex;
       if (mounted) {
         setState(() {
