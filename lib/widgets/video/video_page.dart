@@ -262,12 +262,35 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _savePosition(c.value.position);
-      // The foreground media service is already running while playback is active.
-      // Do not start it again from a background lifecycle callback, which can be
-      // rejected by newer Android foreground-service launch restrictions.
-      unawaited(_syncWakelock());
+      if (!settings.backgroundPlayback) {
+        unawaited(_pauseForBackground(c));
+      } else {
+        unawaited(_syncWakelock());
+      }
     } else if (state == AppLifecycleState.resumed) {
       unawaited(_syncWakelock());
+    }
+  }
+
+  Future<void> _pauseForBackground(VideoPlayerController c) async {
+    if (!c.value.isInitialized || !identical(_controller, c)) return;
+    if (c.value.isPlaying) await c.pause();
+    _lastPlaying = false;
+    await _syncWakelock();
+    await MediaPlaybackService.stop(owner: _mediaOwner);
+  }
+
+  Future<void> _toggleBackgroundPlayback() async {
+    final enabled = !settings.backgroundPlayback;
+    await settings.setBackgroundPlayback(enabled);
+    if (!enabled) {
+      final c = _controller;
+      if (c != null && c.value.isInitialized) await _pauseForBackground(c);
+    } else if (widget.isActive) {
+      final c = _controller;
+      if (c != null && c.value.isInitialized && c.value.isPlaying) {
+        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+      }
     }
   }
 
@@ -596,6 +619,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               ),
               const SizedBox(width: 6),
               _SmallAction(
+                icon: settings.backgroundPlayback ? Icons.headphones_rounded : Icons.headphones_outlined,
+                label: 'خلفية',
+                onTap: _toggleBackgroundPlayback,
+              ),
+              const SizedBox(width: 6),
+              _SmallAction(
                 icon: Icons.repeat,
                 label: _b == null ? 'A-B' : 'A-B ✓',
                 onTap: _ab,
@@ -640,19 +669,15 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                     child: AnimatedOpacity(
                       opacity: _showControls ? 1 : 0,
                       duration: const Duration(milliseconds: 180),
-                      child: Material(
-                        color: Colors.black45,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _togglePlay,
-                          child: Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Icon(
-                              value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 42,
-                            ),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _togglePlay,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 58,
                           ),
                         ),
                       ),
@@ -681,15 +706,23 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                           ),
                           Expanded(
                             child: Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: VideoProgressIndicator(
-                                _controller!,
-                                allowScrubbing: true,
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                colors: const VideoProgressColors(
-                                  playedColor: AppColors.primary,
-                                  bufferedColor: Colors.white38,
-                                  backgroundColor: Colors.white24,
+                              textDirection: TextDirection.rtl,
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2.5,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                  activeTrackColor: AppColors.primary,
+                                  inactiveTrackColor: Colors.white24,
+                                  thumbColor: Colors.white,
+                                ),
+                                child: Slider(
+                                  min: 0,
+                                  max: value.duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+                                  value: value.position.inMilliseconds.toDouble().clamp(0, value.duration.inMilliseconds.toDouble().clamp(1, double.infinity)),
+                                  onChanged: (position) {
+                                    _controller?.seekTo(Duration(milliseconds: position.round()));
+                                  },
                                 ),
                               ),
                             ),
