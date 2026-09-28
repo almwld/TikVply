@@ -577,20 +577,66 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               ]
             : const <Widget>[]),
         if (_showControls)
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: MediaQuery.paddingOf(context).bottom + 12,
-            child: ValueListenableBuilder<VideoPlayerValue>(
-              valueListenable: _controller!,
-              builder: (_, value, __) => Row(
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: _controller!,
+            builder: (_, value, __) => Stack(
+              fit: StackFit.expand,
+              children: [
+                Align(
+                  alignment: Alignment.center,
+                  child: AnimatedOpacity(
+                    opacity: _showControls ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Material(
+                      color: Colors.black45,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _togglePlay,
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Icon(
+                            value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 42,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 12,
+                      right: 12,
+                      bottom: MediaQuery.paddingOf(context).bottom + 12,
+                    ),
+                    child: Row(
                 children: [
                   IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
                   IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seek(-settings.skipSeconds)),
-                  Expanded(child: VideoProgressIndicator(_controller!, allowScrubbing: true, padding: const EdgeInsets.symmetric(horizontal: 4), colors: const VideoProgressColors(playedColor: AppColors.primary, bufferedColor: Colors.white38, backgroundColor: Colors.white24))),
+                  Expanded(
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: VideoProgressIndicator(
+                        _controller!,
+                        allowScrubbing: true,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        colors: const VideoProgressColors(
+                          playedColor: AppColors.primary,
+                          bufferedColor: Colors.white38,
+                          backgroundColor: Colors.white24,
+                        ),
+                      ),
+                    ),
+                  ),
                   IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seek(settings.skipSeconds)),
                   IconButton(icon: Icon(value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white), onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0)),
                 ],
+                  ],
+                ),
               ),
             ),
           ),
