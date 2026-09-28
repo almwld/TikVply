@@ -293,6 +293,7 @@ class _MediaViewer extends StatefulWidget {
 class _MediaViewerState extends State<_MediaViewer> {
   late final PageController _controller;
   late int _activeIndex;
+  bool _isScrolling = false;
 
   @override
   void initState() {
@@ -315,23 +316,44 @@ class _MediaViewerState extends State<_MediaViewer> {
       Navigator.of(context).maybePop();
     }
   }
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollStartNotification) {
+      if (!_isScrolling && mounted) setState(() => _isScrolling = true);
+    } else if (notification is ScrollEndNotification) {
+      final metrics = notification.metrics;
+      final index = metrics.page?.round() ?? _activeIndex;
+      if (mounted) {
+        setState(() {
+          _activeIndex = index.clamp(0, widget.videos.length - 1);
+          _isScrolling = false;
+        });
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.black,
     body: Stack(children: [
-      PageView.builder(
-        scrollDirection: Axis.vertical,
-        controller: _controller,
-        allowImplicitScrolling: false,
-        onPageChanged: (index) {
-          if (mounted) setState(() => _activeIndex = index);
-        },
-        itemCount: widget.videos.length,
-        itemBuilder: (_, index) => VideoPage(
-          key: ValueKey(widget.videos[index].id),
-          video: widget.videos[index],
-          isActive: index == _activeIndex,
-          onCompleted: context.read<VideoSettingsProvider>().autoNext ? _next : null,
+      NotificationListener<ScrollNotification>(
+        onNotification: _handleScrollNotification,
+        child: PageView.builder(
+          scrollDirection: Axis.vertical,
+          controller: _controller,
+          allowImplicitScrolling: false,
+          onPageChanged: (index) {
+            if (_isScrolling) return;
+            if (mounted) setState(() => _activeIndex = index);
+          },
+          itemCount: widget.videos.length,
+          itemBuilder: (_, index) => VideoPage(
+            key: ValueKey(widget.videos[index].id),
+            video: widget.videos[index],
+            isActive: !_isScrolling && index == _activeIndex,
+            onCompleted: context.read<VideoSettingsProvider>().autoNext ? _next : null,
+          ),
         ),
       ),
     ]),
