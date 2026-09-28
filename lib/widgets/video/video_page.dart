@@ -555,15 +555,32 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Widget _controls() {
     return Stack(
       children: [
-        const Positioned(top: 0, left: 0, right: 0, child: IgnorePointer(child: _TopGradient())),
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(child: _TopGradient()),
+        ),
         Positioned(
           top: MediaQuery.paddingOf(context).top + 4,
           right: 4,
           child: Row(
             children: [
-              IconButton(onPressed: _pip, tooltip: 'صورة داخل صورة', icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white)),
-              IconButton(onPressed: _fullscreenToggle, tooltip: 'ملء الشاشة', icon: Icon(_fullscreen ? Icons.fullscreen_exit : Icons.fullscreen, color: Colors.white)),
-              IconButton(onPressed: _lock, tooltip: 'قفل', icon: const Icon(Icons.lock_open_rounded, color: Colors.white)),
+              IconButton(
+                onPressed: _pip,
+                tooltip: 'صورة داخل صورة',
+                icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white),
+              ),
+              IconButton(
+                onPressed: _fullscreenToggle,
+                tooltip: 'ملء الشاشة',
+                icon: Icon(_fullscreen ? Icons.fullscreen_exit : Icons.fullscreen, color: Colors.white),
+              ),
+              IconButton(
+                onPressed: _lock,
+                tooltip: 'قفل',
+                icon: const Icon(Icons.lock_open_rounded, color: Colors.white),
+              ),
             ],
           ),
         ),
@@ -572,91 +589,130 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           left: 8,
           child: Row(
             children: [
-              _SmallAction(icon: Icons.timer, label: _sleepMinutes == null ? 'مؤقت' : '$_sleepMinutesد', onTap: _sleepMenu),
+              _SmallAction(
+                icon: Icons.timer,
+                label: _sleepMinutes == null ? 'مؤقت' : '$_sleepMinutesد',
+                onTap: _sleepMenu,
+              ),
               const SizedBox(width: 6),
-              _SmallAction(icon: Icons.repeat, label: _b == null ? 'A-B' : 'A-B ✓', onTap: _ab),
+              _SmallAction(
+                icon: Icons.repeat,
+                label: _b == null ? 'A-B' : 'A-B ✓',
+                onTap: _ab,
+              ),
             ],
           ),
         ),
-        Positioned(left: 78, right: 12, bottom: 92, child: IgnorePointer(child: VideoInfo(video: widget.video))),
-        Positioned(right: 10, bottom: 92, child: VideoActions(video: widget.video)),
-        ...(_zoom > 1.05
-            ? <Widget>[
-                Positioned(
-                  left: 12,
-                  bottom: 205,
-                  child: Material(
-                    color: Colors.black54,
-                    shape: const CircleBorder(),
-                    child: IconButton(tooltip: 'إعادة حجم الفيديو', onPressed: _resetZoom, icon: const Icon(Icons.fit_screen_rounded, color: Colors.white)),
-                  ),
-                ),
-              ]
-            : const <Widget>[]),
+        Positioned(
+          left: 78,
+          right: 12,
+          bottom: 92,
+          child: IgnorePointer(child: VideoInfo(video: widget.video)),
+        ),
+        Positioned(
+          right: 10,
+          bottom: 92,
+          child: VideoActions(video: widget.video),
+        ),
+        if (_zoom > 1.05)
+          Positioned(
+            left: 12,
+            bottom: 205,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: 'إعادة حجم الفيديو',
+                onPressed: _resetZoom,
+                icon: const Icon(Icons.fit_screen_rounded, color: Colors.white),
+              ),
+            ),
+          ),
         if (_showControls)
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: _controller!,
-            builder: (_, value, __) => Stack(
-              fit: StackFit.expand,
-              children: [
-                Align(
-                  alignment: Alignment.center,
-                  child: AnimatedOpacity(
-                    opacity: _showControls ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: Material(
-                      color: Colors.black45,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: _togglePlay,
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Icon(
-                            value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 42,
+            builder: (_, value, __) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Align(
+                    alignment: Alignment.center,
+                    child: AnimatedOpacity(
+                      opacity: _showControls ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Material(
+                        color: Colors.black45,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _togglePlay,
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: Icon(
+                              value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 42,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      left: 12,
-                      right: 12,
-                      bottom: MediaQuery.paddingOf(context).bottom + 12,
-                    ),
-                    child: Row(
-                children: [
-                  IconButton(icon: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white), onPressed: _togglePlay),
-                  IconButton(icon: const Icon(Icons.replay_10_rounded, color: Colors.white), onPressed: () => _seek(-settings.skipSeconds)),
-                  Expanded(
-                    child: Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: VideoProgressIndicator(
-                        _controller!,
-                        allowScrubbing: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        colors: const VideoProgressColors(
-                          playedColor: AppColors.primary,
-                          bufferedColor: Colors.white38,
-                          backgroundColor: Colors.white24,
-                        ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        bottom: MediaQuery.paddingOf(context).bottom + 12,
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                            ),
+                            onPressed: _togglePlay,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                            onPressed: () => _seek(-settings.skipSeconds),
+                          ),
+                          Expanded(
+                            child: Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: VideoProgressIndicator(
+                                _controller!,
+                                allowScrubbing: true,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                colors: const VideoProgressColors(
+                                  playedColor: AppColors.primary,
+                                  bufferedColor: Colors.white38,
+                                  backgroundColor: Colors.white24,
+                                ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                            onPressed: () => _seek(settings.skipSeconds),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  IconButton(icon: const Icon(Icons.forward_10_rounded, color: Colors.white), onPressed: () => _seek(settings.skipSeconds)),
-                  IconButton(icon: Icon(value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded, color: Colors.white), onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0)),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        ),
-        ),
       ],
     );
   }
