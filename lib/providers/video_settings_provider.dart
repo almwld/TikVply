@@ -13,6 +13,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   static const _gesturesKey = 'video_gestures';
   static const _notificationsKey = 'video_notifications';
   static const _wakelockKey = 'video_wakelock';
+  static const _backgroundPlaybackKey = 'video_background_playback';
   static const _skipKey = 'video_skip_seconds';
 
   double _playbackSpeed = 1.0;
@@ -24,6 +25,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool _gesturesEnabled = true;
   bool _mediaNotifications = true;
   bool _keepScreenAwake = true;
+  bool _backgroundPlayback = false;
   int _skipSeconds = 10;
 
   double get playbackSpeed => _playbackSpeed;
@@ -35,6 +37,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool get gesturesEnabled => _gesturesEnabled;
   bool get mediaNotifications => _mediaNotifications;
   bool get keepScreenAwake => _keepScreenAwake;
+  bool get backgroundPlayback => _backgroundPlayback;
   int get skipSeconds => _skipSeconds;
 
   VideoSettingsProvider() { _load(); }
@@ -51,6 +54,7 @@ class VideoSettingsProvider extends ChangeNotifier {
     _gesturesEnabled = prefs.getBool(_gesturesKey) ?? true;
     _mediaNotifications = prefs.getBool(_notificationsKey) ?? true;
     _keepScreenAwake = prefs.getBool(_wakelockKey) ?? true;
+    _backgroundPlayback = prefs.getBool(_backgroundPlaybackKey) ?? false;
     _skipSeconds = prefs.getInt(_skipKey) ?? 10;
     notifyListeners();
   }
@@ -70,6 +74,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   Future<void> setGesturesEnabled(bool value) async => _saveBool(_gesturesKey, _gesturesEnabled = value);
   Future<void> setMediaNotifications(bool value) async => _saveBool(_notificationsKey, _mediaNotifications = value);
   Future<void> setKeepScreenAwake(bool value) async => _saveBool(_wakelockKey, _keepScreenAwake = value);
+  Future<void> setBackgroundPlayback(bool value) async => _saveBool(_backgroundPlaybackKey, _backgroundPlayback = value);
 
   Future<void> setSkipSeconds(int value) async {
     _skipSeconds = value.clamp(5, 60);
@@ -100,10 +105,11 @@ class VideoSettingsProvider extends ChangeNotifier {
     _gesturesEnabled = true;
     _mediaNotifications = true;
     _keepScreenAwake = true;
+    _backgroundPlayback = false;
     _skipSeconds = 10;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    for (final key in [_speedKey, _fitKey, _mutedKey, _autoplayKey, _loopKey, _autoNextKey, _gesturesKey, _notificationsKey, _wakelockKey, _skipKey]) {
+    for (final key in [_speedKey, _fitKey, _mutedKey, _autoplayKey, _loopKey, _autoNextKey, _gesturesKey, _notificationsKey, _wakelockKey, _backgroundPlaybackKey, _skipKey]) {
       await prefs.remove(key);
     }
   }
