@@ -45,6 +45,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   int? _sleepMinutes;
   final Object _mediaOwner = Object();
   int _openGeneration = 0;
+  Future<void> _controlQueue = Future<void>.value();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -259,7 +260,13 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _playOnly() async {
+  Future<void> _enqueueControl(Future<void> Function() operation) {
+    final next = _controlQueue.then((_) => operation());
+    _controlQueue = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _playOnly() => _enqueueControl(() async {
     final c = _controller;
     if (_locked || c == null || !c.value.isInitialized || !widget.isActive) return;
     if (!c.value.isPlaying) await c.play();
@@ -271,9 +278,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       setState(() => _showControls = true);
       _scheduleHide();
     }
-  }
+  });
 
-  Future<void> _togglePlay() async {
+  Future<void> _togglePlay() => _enqueueControl(() async {
     final c = _controller;
     if (_locked || c == null || !c.value.isInitialized || !widget.isActive) return;
     if (c.value.isPlaying) {
@@ -287,7 +294,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     await MediaPlaybackService.update(playing: _lastPlaying);
     setState(() => _showControls = true);
     _scheduleHide();
-  }
+  });
 
   void _tap() {
     if (_locked) return;
