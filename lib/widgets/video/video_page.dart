@@ -267,6 +267,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   @override
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Only the visible PageView item owns playback and the media notification.
     // Neighboring pages stay mounted for smooth paging, so lifecycle callbacks
@@ -301,7 +302,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
     final c = _controller;
     if (_locked || c == null || !c.value.isInitialized) return;
     if (c.value.isPlaying) {
