@@ -702,29 +702,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                           icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
                           onPressed: () => _seek(-settings.skipSeconds),
                         ),
-                        Expanded(
-                          child: Directionality(
-                            textDirection: TextDirection.rtl,
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 2.5,
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                activeTrackColor: AppColors.primary,
-                                inactiveTrackColor: Colors.white24,
-                                thumbColor: Colors.white,
-                              ),
-                              child: Slider(
-                                min: 0,
-                                max: maxMs,
-                                value: positionMs,
-                                onChanged: (position) {
-                                  _controller?.seekTo(Duration(milliseconds: position.round()));
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
+                        const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
                           onPressed: () => _seek(settings.skipSeconds),
