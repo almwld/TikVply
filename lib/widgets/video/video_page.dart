@@ -635,18 +635,18 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         Positioned(
           left: 78,
           right: 12,
-          bottom: 92,
+          bottom: 112,
           child: IgnorePointer(child: VideoInfo(video: widget.video)),
         ),
         Positioned(
           right: 10,
-          bottom: 92,
+          bottom: 112,
           child: VideoActions(video: widget.video),
         ),
         if (_zoom > 1.05)
           Positioned(
             left: 12,
-            bottom: 205,
+            bottom: 225,
             child: Material(
               color: Colors.black54,
               shape: const CircleBorder(),
@@ -661,6 +661,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: _controller!,
             builder: (_, value, __) {
+              final maxMs = value.duration.inMilliseconds.toDouble().clamp(1, double.infinity);
+              final positionMs = value.position.inMilliseconds.toDouble().clamp(0, maxMs);
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -673,72 +675,93 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                         behavior: HitTestBehavior.opaque,
                         onTap: _togglePlay,
                         child: Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           child: Icon(
                             value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                             color: Colors.white,
-                            size: 58,
+                            size: 62,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: 12,
-                        right: 12,
-                        bottom: MediaQuery.paddingOf(context).bottom + 12,
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              color: Colors.white,
-                            ),
-                            onPressed: _togglePlay,
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: MediaQuery.paddingOf(context).bottom + 18,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
-                            onPressed: () => _seek(-settings.skipSeconds),
-                          ),
-                          Expanded(
-                            child: Directionality(
-                              textDirection: TextDirection.rtl,
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 2.5,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                  activeTrackColor: AppColors.primary,
-                                  inactiveTrackColor: Colors.white24,
-                                  thumbColor: Colors.white,
-                                ),
-                                child: Slider(
-                                  min: 0,
-                                  max: value.duration.inMilliseconds.toDouble().clamp(1, double.infinity),
-                                  value: value.position.inMilliseconds.toDouble().clamp(0, value.duration.inMilliseconds.toDouble().clamp(1, double.infinity)),
-                                  onChanged: (position) {
-                                    _controller?.seekTo(Duration(milliseconds: position.round()));
-                                  },
-                                ),
+                          onPressed: _togglePlay,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                          onPressed: () => _seek(-settings.skipSeconds),
+                        ),
+                        Expanded(
+                          child: Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2.5,
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                activeTrackColor: AppColors.primary,
+                                inactiveTrackColor: Colors.white24,
+                                thumbColor: Colors.white,
+                              ),
+                              child: Slider(
+                                min: 0,
+                                max: maxMs,
+                                value: positionMs,
+                                onChanged: (position) {
+                                  _controller?.seekTo(Duration(milliseconds: position.round()));
+                                },
                               ),
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
-                            onPressed: () => _seek(settings.skipSeconds),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                          onPressed: () => _seek(settings.skipSeconds),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                            color: Colors.white,
                           ),
-                          IconButton(
-                            icon: Icon(
-                              value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                              color: Colors.white,
-                            ),
-                            onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0),
-                          ),
-                        ],
+                          onPressed: () => _controller?.setVolume(value.volume == 0 ? 1 : 0),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: MediaQuery.paddingOf(context).bottom + 2,
+                    child: Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: Colors.white38,
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: maxMs,
+                          value: positionMs,
+                          onChanged: (position) {
+                            _controller?.seekTo(Duration(milliseconds: position.round()));
+                          },
+                        ),
                       ),
                     ),
                   ),
