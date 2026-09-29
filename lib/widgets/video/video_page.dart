@@ -674,13 +674,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: _togglePlay,
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Icon(
-                            value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 62,
-                          ),
+                        child: Icon(
+                          value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 48,
                         ),
                       ),
                     ),
