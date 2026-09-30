@@ -173,7 +173,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         _lastPlaying = controller.value.isPlaying;
         await _syncWakelock();
         if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) return;
-        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying);
+        await _syncMediaSession();
       }
       if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) return;
       _startSaving();
@@ -266,6 +266,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await c.setVolume(settings.muted ? 0 : c.value.volume);
       await c.setPlaybackSpeed(settings.playbackSpeed);
       await _syncWakelock();
+      if (widget.isActive) await _syncMediaSession();
     } catch (_) {}
   }
 
@@ -434,8 +435,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       if (!available) return;
       final c = _controller;
       if (c == null || !c.value.isInitialized) return;
+      final entered = await _platform.invokeMethod<bool>('enterPip') ?? false;
+      if (!entered) return;
       _inPip = true;
-      await _platform.invokeMethod('enterPip');
       await _syncWakelock();
       await _syncMediaSession();
     } catch (_) {}
