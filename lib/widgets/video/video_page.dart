@@ -39,6 +39,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   double _zoom = 1.0;
   late final TransformationController _zoomController;
   bool _lastPlaying = false;
+  bool _inPip = false;
   Offset _likePosition = Offset.zero;
   Duration? _a;
   Duration? _b;
@@ -179,6 +180,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       _scheduleHide();
       final provider = context.read<VideoProvider>();
       await provider.updateVideoMetadata(widget.video.id, duration: controller.value.duration, aspectRatio: controller.value.aspectRatio);
+      if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) return;
       await provider.incrementViews(widget.video.id);
     } catch (error, stack) {
       debugPrint('TikVply player open failed: $error');
@@ -231,6 +233,22 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _syncMediaSession() async {
+    if (!mounted || !widget.isActive) return;
+    if (!settings.mediaNotifications) {
+      await MediaPlaybackService.stopAndClear(_mediaOwner);
+      MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+      return;
+    }
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    await MediaPlaybackService.start(
+      title: widget.video.caption ?? 'TikVply',
+      playing: c.value.isPlaying,
+      owner: _mediaOwner,
+    );
+  }
+
   Future<void> _syncWakelock() async {
     final c = _controller;
     if (c != null && c.value.isInitialized && c.value.isPlaying && settings.keepScreenAwake) {
@@ -272,13 +290,15 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (c == null || !c.value.isInitialized) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _savePosition(c.value.position);
-      if (!settings.backgroundPlayback) {
+      if (!settings.backgroundPlayback && !_inPip) {
         unawaited(_pauseForBackground(c));
       } else {
         unawaited(_syncWakelock());
       }
     } else if (state == AppLifecycleState.resumed) {
+      _inPip = false;
       unawaited(_syncWakelock());
+      unawaited(_syncMediaSession());
     }
   }
 
@@ -299,7 +319,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     } else if (widget.isActive) {
       final c = _controller;
       if (c != null && c.value.isInitialized && c.value.isPlaying) {
-        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true, owner: _mediaOwner);
+        await _syncMediaSession();
       }
     }
   }
@@ -317,7 +337,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!mounted || !widget.isActive || !identical(_controller, c)) return;
     _lastPlaying = c.value.isPlaying;
     await _syncWakelock();
-    await MediaPlaybackService.update(playing: _lastPlaying, owner: _mediaOwner);
+    await _syncMediaSession();
     if (mounted) {
       setState(() => _showControls = true);
       _scheduleHide();
@@ -412,8 +432,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     try {
       final available = await _platform.invokeMethod<bool>('isPipAvailable') ?? false;
       if (!available) return;
+      final c = _controller;
+      if (c == null || !c.value.isInitialized) return;
+      _inPip = true;
       await _platform.invokeMethod('enterPip');
-      await _controller?.play();
+      await _syncWakelock();
+      await _syncMediaSession();
     } catch (_) {}
   }
 
