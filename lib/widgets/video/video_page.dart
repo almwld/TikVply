@@ -661,8 +661,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: _controller!,
             builder: (_, value, __) {
-              final maxMs = value.duration.inMilliseconds.toDouble().clamp(1, double.infinity);
-              final positionMs = value.position.inMilliseconds.toDouble().clamp(0, maxMs);
+              final maxMs = value.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity).toDouble();
+              final positionMs = value.position.inMilliseconds.toDouble().clamp(0.0, maxMs).toDouble();
               return Stack(
                 fit: StackFit.expand,
                 children: [
