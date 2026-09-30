@@ -75,7 +75,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       } else {
         _openGeneration++;
         if (MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
-          MediaPlaybackService.stop();
+          unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
         }
         if (c != null) {
           c.pause();
@@ -97,7 +97,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!mounted || !widget.isActive || !identical(_controller, c)) return;
     _lastPlaying = c.value.isPlaying;
     await _syncWakelock();
-    await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying);
+    await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying, owner: _mediaOwner);
   }
 
   Future<void> _handleMediaAction(String action) async {
@@ -301,7 +301,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     } else if (widget.isActive) {
       final c = _controller;
       if (c != null && c.value.isInitialized && c.value.isPlaying) {
-        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true);
+        await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: true, owner: _mediaOwner);
       }
     }
   }
@@ -319,7 +319,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (!mounted || !widget.isActive || !identical(_controller, c)) return;
     _lastPlaying = c.value.isPlaying;
     await _syncWakelock();
-    await MediaPlaybackService.update(playing: _lastPlaying);
+    await MediaPlaybackService.update(playing: _lastPlaying, owner: _mediaOwner);
     if (mounted) {
       setState(() => _showControls = true);
       _scheduleHide();
@@ -504,7 +504,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
-    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) MediaPlaybackService.stop();
+    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
