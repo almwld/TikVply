@@ -110,6 +110,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         await _playOnly();
         break;
       case 'next':
+        if (_completionSent) return;
+        _completionSent = true;
+        _playback.clearPosition(widget.video.id);
         widget.onCompleted?.call();
         break;
       case 'open':
