@@ -84,7 +84,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
               onRefresh: () => _refreshIfNeeded(force: true),
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                scrollCacheExtent: 420,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(420),
                 slivers: [
                   SliverToBoxAdapter(child: _searchField()),
                   SliverToBoxAdapter(child: _sortRow(videos.length)),
