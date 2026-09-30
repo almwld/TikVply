@@ -74,9 +74,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         }
       } else {
         _openGeneration++;
-        if (MediaPlaybackService.clearActiveHandler(_mediaOwner)) {
-          unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
-        }
+        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
         if (c != null) {
           c.pause();
           if (c.value.isInitialized) _savePosition(c.value.position);
@@ -504,7 +502,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
     c?.dispose();
-    if (widget.isActive && MediaPlaybackService.clearActiveHandler(_mediaOwner)) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+    if (widget.isActive) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
