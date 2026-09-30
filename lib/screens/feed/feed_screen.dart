@@ -191,6 +191,8 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   late final PageController _controller;
   bool _following = false;
+  bool _isScrolling = false;
+  int _activeIndex = 0;
 
   @override
   void initState() {
@@ -210,7 +212,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _openNext(VideoProvider videos) {
-    final next = videos.currentIndex + 1;
+    final next = _activeIndex + 1;
     if (next < videos.videos.length && _controller.hasClients) {
       _controller.animateToPage(next, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
     }
@@ -224,17 +226,39 @@ class _FeedScreenState extends State<FeedScreen> {
         color: Colors.black,
         child: Stack(fit: StackFit.expand, children: [
           if (videos.videos.isEmpty) _emptyState(context, videos)
-          else PageView.builder(
-            controller: _controller,
-            scrollDirection: Axis.vertical,
-            physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
-            itemCount: videos.videos.length,
-            onPageChanged: videos.setCurrentIndex,
-            itemBuilder: (_, i) => VideoPage(
-              key: ValueKey(videos.videos[i].id),
-              video: videos.videos[i],
-              isActive: i == videos.currentIndex,
-              onCompleted: context.read<VideoSettingsProvider>().autoNext ? () => _openNext(videos) : null,
+          else NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.depth != 0) return false;
+              if (notification is ScrollStartNotification) {
+                if (!_isScrolling && mounted) setState(() => _isScrolling = true);
+              } else if (notification is ScrollEndNotification) {
+                final index = _controller.hasClients
+                    ? (_controller.page?.round() ?? _activeIndex)
+                    : _activeIndex;
+                final next = index.clamp(0, videos.videos.length - 1);
+                if (mounted) {
+                  setState(() {
+                    _activeIndex = next;
+                    _isScrolling = false;
+                  });
+                  videos.setCurrentIndex(next);
+                }
+              }
+              return false;
+            },
+            child: PageView.builder(
+              controller: _controller,
+              scrollDirection: Axis.vertical,
+              physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
+              itemCount: videos.videos.length,
+              allowImplicitScrolling: false,
+              onPageChanged: (_) {},
+              itemBuilder: (_, i) => VideoPage(
+                key: ValueKey(videos.videos[i].id),
+                video: videos.videos[i],
+                isActive: !_isScrolling && i == _activeIndex,
+                onCompleted: context.read<VideoSettingsProvider>().autoNext ? () => _openNext(videos) : null,
+              ),
             ),
           ),
           Positioned(top: 0, left: 0, right: 0, child: SafeArea(child: _topBar(context, videos))),
