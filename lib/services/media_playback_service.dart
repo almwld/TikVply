@@ -9,6 +9,7 @@ class MediaPlaybackService {
   static Object? _activeOwner;
   static bool _handlerInstalled = false;
   static Future<void> _actionQueue = Future<void>.value();
+  static Future<void> _mediaQueue = Future<void>.value();
   static final List<String> _pendingActions = <String>[];
 
   static void initialize() {
@@ -53,20 +54,33 @@ class MediaPlaybackService {
   static Future<void> start({
     required String title,
     required bool playing,
-  }) async {
+    Object? owner,
+  }) => _enqueueMediaOperation(() async {
+    if (owner != null && _activeOwner != owner) return;
     try {
       await requestNotificationPermission();
+      if (owner != null && _activeOwner != owner) return;
       await _channel.invokeMethod('startMedia', {
         'title': title,
         'playing': playing,
       });
     } catch (_) {}
-  }
+  });
 
-  static Future<void> update({required bool playing}) async {
+  static Future<void> update({
+    required bool playing,
+    Object? owner,
+  }) => _enqueueMediaOperation(() async {
+    if (owner != null && _activeOwner != owner) return;
     try {
       await _channel.invokeMethod('updateMedia', {'playing': playing});
     } catch (_) {}
+  });
+
+  static Future<void> _enqueueMediaOperation(Future<void> Function() operation) {
+    final next = _mediaQueue.then((_) => operation());
+    _mediaQueue = next.catchError((_) {});
+    return next;
   }
 
   /// Clears the active owner only when [owner] still owns the media session.
@@ -79,10 +93,20 @@ class MediaPlaybackService {
     return true;
   }
 
-  static Future<void> stop({Object? owner}) async {
+  static Future<void> stop({Object? owner}) => _enqueueMediaOperation(() async {
     if (owner != null && _activeOwner != owner) return;
     try { await _channel.invokeMethod('stopMedia'); } catch (_) {}
-  }
+  });
+
+  /// Atomically releases the current owner before stopping the native session.
+  /// The stop is serialized with newer start/update operations, preventing an
+  /// outgoing page from stopping the next page's notification.
+  static Future<void> stopAndClear(Object owner) => _enqueueMediaOperation(() async {
+    if (_activeOwner != owner) return;
+    _activeHandler = null;
+    _activeOwner = null;
+    try { await _channel.invokeMethod('stopMedia'); } catch (_) {}
+  });
 
   static Future<void> showSmartUnseenNotification(int count) async {
     if (count <= 0) return;
