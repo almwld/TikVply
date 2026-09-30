@@ -308,7 +308,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (c.value.isPlaying) await c.pause();
     _lastPlaying = false;
     await _syncWakelock();
-    await MediaPlaybackService.stop(owner: _mediaOwner);
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
   }
 
   Future<void> _toggleBackgroundPlayback() async {
