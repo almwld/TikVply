@@ -161,10 +161,19 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
       if (settings.autoplay) {
         await controller.play();
+        if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) {
+          controller.removeListener(_listener);
+          await controller.pause();
+          await controller.dispose();
+          if (identical(_controller, controller)) _controller = null;
+          return;
+        }
         _lastPlaying = controller.value.isPlaying;
         await _syncWakelock();
+        if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) return;
         await MediaPlaybackService.start(title: widget.video.caption ?? 'TikVply', playing: _lastPlaying);
       }
+      if (!mounted || generation != _openGeneration || !widget.isActive || !identical(_controller, controller)) return;
       _startSaving();
       _scheduleHide();
       final provider = context.read<VideoProvider>();
