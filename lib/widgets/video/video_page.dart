@@ -666,7 +666,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-        if (_showControls)
+        if (_showControls && _controller != null)
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: _controller!,
             builder: (_, value, __) {
