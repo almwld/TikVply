@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../providers/feed_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
@@ -22,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: const TikVplyAppBar(title: 'اكتشف'),
       body: Consumer<VideoProvider>(builder: (context, provider, _) {
         final list = provider.videos.where((v) => query.isEmpty || '${v.caption ?? ''} ${v.user?.username ?? ''} ${v.hashtags.join(' ')}'.toLowerCase().contains(query)).toList();
-        if (provider.isLoading && list.isEmpty) return const _DiscoverShimmer();
+        if (provider.isLoading && list.isEmpty) return const ColoredBox(color: Color(0xFF101820), child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)));
         return RefreshIndicator(
           onRefresh: provider.refreshDeviceVideos,
           child: Column(children: [
@@ -48,4 +47,3 @@ class _ThumbState extends State<_Thumb> with AutomaticKeepAliveClientMixin {
   Widget _fallback() => const ColoredBox(color: Color(0xFF102624), child: Center(child: Icon(Icons.video_file_rounded, color: Colors.white54, size: 40)));
   @override bool get wantKeepAlive => true;
 }
-class _DiscoverShimmer extends StatelessWidget { const _DiscoverShimmer(); @override Widget build(BuildContext context) => Shimmer.fromColors(baseColor: Colors.black12, highlightColor: Colors.white70, child: GridView.builder(padding: const EdgeInsets.all(6), itemCount: 10, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 6, mainAxisSpacing: 6, childAspectRatio: .68), itemBuilder: (_, __) => const Card())); }

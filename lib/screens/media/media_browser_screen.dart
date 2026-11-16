@@ -5,7 +5,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
@@ -277,10 +276,11 @@ class _ThumbnailState extends State<_Thumbnail> {
 class _MediaLoadingGrid extends StatelessWidget {
   const _MediaLoadingGrid();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(
-    baseColor: Colors.black12,
-    highlightColor: Colors.white70,
-    child: GridView.builder(padding: const EdgeInsets.all(5), itemCount: 18, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4), itemBuilder: (_, __) => const ColoredBox(color: Colors.white)),
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFF101820),
+    child: Center(
+      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+    ),
   );
 }
 
