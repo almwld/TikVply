@@ -578,7 +578,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         child: ValueListenableBuilder<VideoPlayerValue>(
           valueListenable: c,
           builder: (_, value, __) {
-            if (!value.isInitialized) return const _VideoLoadingShimmer();
+            if (!value.isInitialized) return const _VideoLoadingIndicator();
             final fit = switch (settings.fitMode) {
               VideoFitMode.cover => BoxFit.cover,
               VideoFitMode.contain => BoxFit.contain,
