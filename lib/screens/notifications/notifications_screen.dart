@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/notification_provider.dart';
 import '../../models/notification/notification_model.dart';
@@ -33,7 +32,7 @@ class NotificationsScreen extends StatelessWidget {
             ),
             body: Consumer<NotificationProvider>(
               builder: (context, provider, _) {
-                if (provider.isLoading) return const _NotificationShimmer();
+                if (provider.isLoading) return const Center(child: CircularProgressIndicator());
                 final notifications = provider.notifications;
                 if (notifications.isEmpty) return _emptyState(provider);
                 return RefreshIndicator(
@@ -163,17 +162,3 @@ class _NotificationTile extends StatelessWidget {
   }
 }
 
-class _NotificationShimmer extends StatelessWidget {
-  const _NotificationShimmer();
-  @override
-  Widget build(BuildContext context) => Shimmer.fromColors(
-        baseColor: Colors.black12,
-        highlightColor: Colors.white70,
-        child: ListView.separated(
-          padding: const EdgeInsets.all(12),
-          itemCount: 8,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (_, __) => const SizedBox(height: 78, child: Card()),
-        ),
-      );
-}
