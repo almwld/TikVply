@@ -56,7 +56,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       ),
     );
     _completedSubscription = _player.stream.completed.listen((completed) {
-      if (completed && !_completedSent) {
+      if (completed && widget.isActive && !_completedSent) {
         _completedSent = true;
         widget.onCompleted?.call();
       }
@@ -107,6 +107,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     final generation = ++_openGeneration;
     await _pendingDeactivation;
     if (!mounted || !widget.isActive || generation != _openGeneration) return;
+    setState(() => _loading = true);
     final path = widget.video.videoUrl;
     try {
       if (!path.startsWith('http://') && !path.startsWith('https://')) {
@@ -151,15 +152,17 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
         _failed = true;
         _error = 'تعذر تشغيل هذا الملف';
       });
-      _completeAfterFailure();
+      _completeAfterFailure(generation);
     }
   }
 
-  void _completeAfterFailure() {
+  void _completeAfterFailure(int generation) {
     if (_completedSent || widget.onCompleted == null) return;
     _completedSent = true;
     Future<void>.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) widget.onCompleted?.call();
+      if (mounted && widget.isActive && generation == _openGeneration) {
+        widget.onCompleted?.call();
+      }
     });
   }
 
