@@ -72,7 +72,7 @@ class _MediaFolderBrowserScreenState extends State<MediaFolderBrowserScreen> {
     }
   }
 
-  Future<void> _openFolder(AssetPathEntity folder) async {
+  Future<void> _openFolder(AssetPathEntity folder, {bool push = true}) async {
     setState(() {
       _loadingFolder = true;
       _error = null;
@@ -84,7 +84,7 @@ class _MediaFolderBrowserScreenState extends State<MediaFolderBrowserScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        _folderStack = [..._folderStack, folder];
+        _folderStack = push ? [..._folderStack, folder] : _folderStack;
         _assets = results[0] as List<AssetEntity>;
         _subfolders = results[1] as List<AssetPathEntity>;
         _loadingFolder = false;
@@ -149,12 +149,11 @@ class _MediaFolderBrowserScreenState extends State<MediaFolderBrowserScreen> {
     }
     final parent = _folderStack[_folderStack.length - 2];
     _folderStack = _folderStack.sublist(0, _folderStack.length - 1);
-    _openFolder(parent);
+    _openFolder(parent, push: false);
   }
 
   VideoModel _toVideo(AssetEntity asset, String path) {
     final seconds = asset.duration;
-    final duration = Duration(seconds: seconds);
     final label = seconds >= 3600
         ? '${seconds ~/ 3600}:${((seconds % 3600) ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}'
         : '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
