@@ -74,18 +74,28 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         }
       } else {
         _openGeneration++;
-        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
-        if (c != null) {
-          c.pause();
-          if (c.value.isInitialized) _savePosition(c.value.position);
-          c.removeListener(_listener);
-          c.dispose();
-          _controller = null;
-        }
+        unawaited(_deactivateController(c));
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _deactivateController(VideoPlayerController? controller) async {
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
+    if (controller == null) return;
+    try {
+      if (controller.value.isInitialized) {
+        await controller.pause();
+        _savePosition(controller.value.position);
+      }
+    } catch (error) {
+      debugPrint('TikVply player pause during deactivation failed: $error');
+    } finally {
+      controller.removeListener(_listener);
+      if (identical(_controller, controller)) _controller = null;
+      await controller.dispose();
     }
   }
 
