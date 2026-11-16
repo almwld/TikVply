@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/constants/app_colors.dart';
@@ -546,7 +545,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_loading || _controller == null || !_controller!.value.isInitialized) const _VideoLoadingShimmer() else _video(),
+            if (_loading || _controller == null || !_controller!.value.isInitialized) const _VideoLoadingIndicator() else _video(),
             if (!_loading && _controller != null && _controller!.value.isInitialized && !_locked) _controls(),
             if (_locked)
               Positioned(
@@ -811,8 +810,11 @@ class _TopGradient extends StatelessWidget {
   Widget build(BuildContext context) => Container(height: 140, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])));
 }
 
-class _VideoLoadingShimmer extends StatelessWidget {
-  const _VideoLoadingShimmer();
+class _VideoLoadingIndicator extends StatelessWidget {
+  const _VideoLoadingIndicator();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(baseColor: const Color(0xFF101817), highlightColor: const Color(0xFF2B3836), child: const ColoredBox(color: Color(0xFF171F1E)));
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFF101817),
+    child: Center(child: CircularProgressIndicator(color: Colors.white70)),
+  );
 }
