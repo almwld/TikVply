@@ -107,7 +107,12 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     final generation = ++_openGeneration;
     await _pendingDeactivation;
     if (!mounted || !widget.isActive || generation != _openGeneration) return;
-    setState(() => _loading = true);
+    _completedSent = false;
+    setState(() {
+      _loading = true;
+      _failed = false;
+      _error = null;
+    });
     final path = widget.video.videoUrl;
     try {
       if (!path.startsWith('http://') && !path.startsWith('https://')) {
