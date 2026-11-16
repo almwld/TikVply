@@ -12,6 +12,7 @@ import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
 import '../../widgets/video/mx_video_page.dart';
+import 'media_folder_browser_screen.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
   const MediaBrowserScreen({super.key});
@@ -69,13 +70,22 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
         child: Scaffold(
           appBar: TikVplyAppBar(
             title: 'وسائط الهاتف',
-            actions: [Consumer<VideoProvider>(builder: (_, provider, __) => IconButton(
-              tooltip: 'تحديث المكتبة',
-              onPressed: provider.isRefreshing ? null : () => _refreshIfNeeded(force: true),
-              icon: provider.isRefreshing
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.sync_rounded),
-            ))],
+            actions: [
+              IconButton(
+                tooltip: 'تصفح المجلدات',
+                icon: const Icon(Icons.folder_open_rounded),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const MediaFolderBrowserScreen(),
+                )),
+              ),
+              Consumer<VideoProvider>(builder: (_, provider, __) => IconButton(
+                tooltip: 'تحديث المكتبة',
+                onPressed: provider.isRefreshing ? null : () => _refreshIfNeeded(force: true),
+                icon: provider.isRefreshing
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.sync_rounded),
+              )),
+            ],
           ),
           body: Consumer<VideoProvider>(builder: (_, provider, __) {
             final videos = _prepare(provider.videos);
