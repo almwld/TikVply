@@ -11,7 +11,7 @@ import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
-import '../../widgets/video/video_page.dart';
+import '../../widgets/video/mx_video_page.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
   const MediaBrowserScreen({super.key});
@@ -348,7 +348,7 @@ class _MediaViewerState extends State<_MediaViewer> {
             if (mounted) setState(() => _activeIndex = index);
           },
           itemCount: widget.videos.length,
-          itemBuilder: (_, index) => VideoPage(
+          itemBuilder: (_, index) => MxVideoPage(
             key: ValueKey(widget.videos[index].id),
             video: widget.videos[index],
             isActive: !_isScrolling && index == _activeIndex,
