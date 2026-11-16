@@ -67,12 +67,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (widget.isActive != oldWidget.isActive) {
       final c = _controller;
       if (widget.isActive) {
-        MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
-        if (c == null || !c.value.isInitialized) {
-          _open();
-        } else if (settings.autoplay && !c.value.isPlaying) {
-          unawaited(_resumeActiveController(c));
-        }
+        unawaited(_activateAfterDeactivation());
       } else {
         _openGeneration++;
         _pendingDeactivation = _deactivateController(c);
@@ -80,6 +75,20 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _activateAfterDeactivation() async {
+    await _pendingDeactivation;
+    if (!mounted || !widget.isActive) return;
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      await _open();
+      return;
+    }
+    MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+    if (settings.autoplay && !controller.value.isPlaying) {
+      await _resumeActiveController(controller);
     }
   }
 
