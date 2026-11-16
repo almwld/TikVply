@@ -46,6 +46,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   final Object _mediaOwner = Object();
   int _openGeneration = 0;
   Future<void> _controlQueue = Future<void>.value();
+  Future<void> _pendingDeactivation = Future<void>.value();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -66,26 +67,45 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (widget.isActive != oldWidget.isActive) {
       final c = _controller;
       if (widget.isActive) {
-        MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
-        if (c == null || !c.value.isInitialized) {
-          _open();
-        } else if (settings.autoplay && !c.value.isPlaying) {
-          unawaited(_resumeActiveController(c));
-        }
+        unawaited(_activateAfterDeactivation());
       } else {
         _openGeneration++;
-        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
-        if (c != null) {
-          c.pause();
-          if (c.value.isInitialized) _savePosition(c.value.position);
-          c.removeListener(_listener);
-          c.dispose();
-          _controller = null;
-        }
+        _pendingDeactivation = _deactivateController(c);
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _activateAfterDeactivation() async {
+    await _pendingDeactivation;
+    if (!mounted || !widget.isActive) return;
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      await _open();
+      return;
+    }
+    MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+    if (settings.autoplay && !controller.value.isPlaying) {
+      await _resumeActiveController(controller);
+    }
+  }
+
+  Future<void> _deactivateController(VideoPlayerController? controller) async {
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
+    if (controller == null) return;
+    try {
+      if (controller.value.isInitialized) {
+        await controller.pause();
+        _savePosition(controller.value.position);
+      }
+    } catch (error) {
+      debugPrint('TikVply player pause during deactivation failed: $error');
+    } finally {
+      controller.removeListener(_listener);
+      if (identical(_controller, controller)) _controller = null;
+      await controller.dispose();
     }
   }
 
@@ -140,6 +160,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await previous.dispose();
     }
     if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    await _pendingDeactivation;
+    if (!mounted || generation != _openGeneration || !widget.isActive) return;
     VideoPlayerController? controller;
     try {
       controller = _network

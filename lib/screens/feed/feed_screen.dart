@@ -67,7 +67,16 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onTabTapped(int index) {
     if (index == 2) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()));
+      final previousIndex = _currentIndex;
+      setState(() => _currentIndex = 2);
+      _pageController.jumpToPage(2);
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()))
+          .whenComplete(() {
+        if (!mounted) return;
+        setState(() => _currentIndex = previousIndex);
+        _pageController.jumpToPage(previousIndex);
+      });
       return;
     }
     _setBottomBarVisible(true);
@@ -97,7 +106,7 @@ class _MainScreenState extends State<MainScreen> {
               _setBottomBarVisible(true);
             },
             children: [
-              FeedScreen(onVerticalPageChanged: _onFeedPageChanged),
+              FeedScreen(onVerticalPageChanged: _onFeedPageChanged, isTabActive: _currentIndex == 0),
               const SearchScreen(),
               const SizedBox.shrink(),
               const NotificationsScreen(),
@@ -181,8 +190,9 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key, this.onVerticalPageChanged});
+  const FeedScreen({super.key, this.onVerticalPageChanged, this.isTabActive = true});
   final ValueChanged<double>? onVerticalPageChanged;
+  final bool isTabActive;
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
@@ -192,6 +202,7 @@ class _FeedScreenState extends State<FeedScreen> {
   bool _following = false;
   bool _isScrolling = false;
   int _activeIndex = 0;
+  bool _routeCovered = false;
 
   @override
   void initState() {
@@ -208,6 +219,18 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _handleVerticalScroll() {
     if (_controller.hasClients && _controller.page != null) widget.onVerticalPageChanged?.call(_controller.page!);
+  }
+
+  Future<void> _openMediaBrowser() async {
+    if (!mounted || _routeCovered) return;
+    setState(() => _routeCovered = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
+      );
+    } finally {
+      if (mounted) setState(() => _routeCovered = false);
+    }
   }
 
   void _openNext(VideoProvider videos) {
@@ -255,7 +278,7 @@ class _FeedScreenState extends State<FeedScreen> {
               itemBuilder: (_, i) => VideoPage(
                 key: ValueKey(videos.videos[i].id),
                 video: videos.videos[i],
-                isActive: !_isScrolling && i == _activeIndex,
+                isActive: widget.isTabActive && !_routeCovered && !_isScrolling && i == _activeIndex,
                 onCompleted: context.read<VideoSettingsProvider>().autoNext ? () => _openNext(videos) : null,
               ),
             ),
@@ -270,7 +293,7 @@ class _FeedScreenState extends State<FeedScreen> {
     height: 68,
     child: Stack(alignment: Alignment.topCenter, children: [
       PositionedDirectional(start: 10, top: 6, child: _topIconButton(tooltip: 'تحديث فيديوهات الهاتف', icon: videos.isRefreshing ? null : Icons.sync_rounded, onPressed: videos.isRefreshing ? null : videos.refreshDeviceVideos, child: videos.isRefreshing ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)) : null)),
-      PositionedDirectional(end: 10, top: 6, child: _topIconButton(tooltip: 'مكتبة الفيديو', icon: Icons.video_library_rounded, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen())))),
+      PositionedDirectional(end: 10, top: 6, child: _topIconButton(tooltip: 'مكتبة الفيديو', icon: Icons.video_library_rounded, onPressed: _openMediaBrowser)),
       Center(child: Container(margin: const EdgeInsets.only(top: 6), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4), decoration: BoxDecoration(color: Colors.black.withValues(alpha: .28), borderRadius: BorderRadius.circular(22), border: Border.all(color: Colors.white.withValues(alpha: .10))), child: Row(mainAxisSize: MainAxisSize.min, children: [_tab(context, 'لك', !_following, () => setState(() => _following = false)), const SizedBox(width: 2), _tab(context, 'أتابع', _following, () => setState(() => _following = true))]))),
     ]),
   );
