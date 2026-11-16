@@ -46,6 +46,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   final Object _mediaOwner = Object();
   int _openGeneration = 0;
   Future<void> _controlQueue = Future<void>.value();
+  Future<void> _pendingDeactivation = Future<void>.value();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -74,7 +75,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         }
       } else {
         _openGeneration++;
-        unawaited(_deactivateController(c));
+        _pendingDeactivation = _deactivateController(c);
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
@@ -150,6 +151,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await previous.dispose();
     }
     if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    await _pendingDeactivation;
+    if (!mounted || generation != _openGeneration || !widget.isActive) return;
     VideoPlayerController? controller;
     try {
       controller = _network
