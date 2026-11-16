@@ -67,7 +67,16 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onTabTapped(int index) {
     if (index == 2) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()));
+      final previousIndex = _currentIndex;
+      setState(() => _currentIndex = 2);
+      _pageController.jumpToPage(2);
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()))
+          .whenComplete(() {
+        if (!mounted) return;
+        setState(() => _currentIndex = previousIndex);
+        _pageController.jumpToPage(previousIndex);
+      });
       return;
     }
     _setBottomBarVisible(true);
