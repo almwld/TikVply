@@ -43,6 +43,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Duration? _a;
   Duration? _b;
   int? _sleepMinutes;
+  double? _scrubPositionMs;
+  bool _abSeeking = false;
   final Object _mediaOwner = Object();
   int _openGeneration = 0;
   Future<void> _controlQueue = Future<void>.value();
@@ -169,7 +171,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           : VideoPlayerController.file(File(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false));
       _controller = controller;
       controller.addListener(_listener);
-      await controller.initialize();
+      await controller.initialize().timeout(const Duration(seconds: 20));
       if (!controller.value.isInitialized || controller.value.duration <= Duration.zero) throw StateError('invalid video');
       await _applySettings();
       final saved = await _playback.loadPosition(widget.video.id);
@@ -243,8 +245,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
     final position = c.value.position;
     final duration = c.value.duration;
-    if (_a != null && _b != null && position >= _b! - const Duration(milliseconds: 100)) {
-      c.seekTo(_a!);
+    if (_a != null && _b != null && position >= _b! - const Duration(milliseconds: 100) && !_abSeeking) {
+      _abSeeking = true;
+      unawaited(_seekTo(_a!).whenComplete(() => _abSeeking = false));
       return;
     }
     if (!settings.loop && !_completionSent && duration > Duration.zero && position >= duration - const Duration(milliseconds: 250)) {
@@ -407,22 +410,28 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _seekTo(Duration target) => _enqueueControl(() async {
+    final c = _controller;
+    if (!mounted || !widget.isActive || c == null || !c.value.isInitialized) return;
+    final duration = c.value.duration;
+    final bounded = target < Duration.zero
+        ? Duration.zero
+        : target > duration
+            ? duration
+            : target;
+    await c.seekTo(bounded);
+    if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+    setState(() {
+      _scrubPositionMs = null;
+      _showControls = true;
+    });
+    _scheduleHide();
+  });
+
   void _seek(int seconds) {
-    unawaited(_enqueueControl(() async {
-      final c = _controller;
-      if (!mounted || !widget.isActive || c == null || !c.value.isInitialized) return;
-      final duration = c.value.duration;
-      final target = c.value.position + Duration(seconds: seconds);
-      final bounded = target < Duration.zero
-          ? Duration.zero
-          : target > duration
-              ? duration
-              : target;
-      await c.seekTo(bounded);
-      if (!mounted || !widget.isActive || !identical(_controller, c)) return;
-      setState(() => _showControls = true);
-      _scheduleHide();
-    }));
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    unawaited(_seekTo(c.value.position + Duration(seconds: seconds)));
   }
 
   void _doubleTap(TapDownDetails details) {
@@ -486,10 +495,17 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _sleepMinutes = minutes;
     if (minutes != null) {
       _sleepTimer = Timer(Duration(minutes: minutes), () {
-        _controller?.pause();
-        _sleepMinutes = null;
-        WakelockPlus.disable();
-        if (mounted) setState(() {});
+        unawaited(_enqueueControl(() async {
+          final c = _controller;
+          if (c != null && c.value.isInitialized && c.value.isPlaying) {
+            await c.pause();
+            _lastPlaying = false;
+            await _syncWakelock();
+            await MediaPlaybackService.update(playing: false, owner: _mediaOwner);
+          }
+          _sleepMinutes = null;
+          if (mounted) setState(() {});
+        }));
       });
     }
     setState(() {});
@@ -797,10 +813,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                         child: Slider(
                           min: 0,
                           max: maxMs,
-                          value: positionMs,
-                          onChanged: (position) {
-                            _controller?.seekTo(Duration(milliseconds: position.round()));
-                          },
+                          value: (_scrubPositionMs ?? positionMs).clamp(0.0, maxMs),
+                          onChanged: (position) => setState(() => _scrubPositionMs = position),
+                          onChangeEnd: (position) => unawaited(_seekTo(Duration(milliseconds: position.round()))),
                         ),
                       ),
                     ),
