@@ -3,12 +3,13 @@ name: Build TikVply Android
 on:
   push:
     branches: [main, master, develop]
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tikvply-android-${{ github.ref }}
@@ -500,6 +501,30 @@ jobs:
           name: tikvply-playstore-aab
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
+
+
+      - name: Prepare direct-download release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-assets/TikVply-Android-ARM64.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-assets/TikVply-Android-ARM32.apk
+          cp build/app/outputs/bundle/release/app-release.aab release-assets/TikVply-Google-Play.aab
+          tar -czf release-assets/TikVply-obfuscation-symbols.tar.gz -C build/symbols .
+
+      - name: Publish GitHub Release with direct downloads
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TikVply ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/TikVply-Android-ARM64.apk
+            release-assets/TikVply-Android-ARM32.apk
+            release-assets/TikVply-Google-Play.aab
+            release-assets/TikVply-obfuscation-symbols.tar.gz
 
       - name: 📤 Upload Dart obfuscation symbols
         uses: actions/upload-artifact@v4
