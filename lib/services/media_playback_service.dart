@@ -11,6 +11,7 @@ class MediaPlaybackService {
   static Future<void> _actionQueue = Future<void>.value();
   static Future<void> _mediaQueue = Future<void>.value();
   static final List<String> _pendingActions = <String>[];
+  static const int _maxPendingActions = 8;
 
   static void initialize() {
     if (_handlerInstalled) return;
@@ -40,9 +41,8 @@ class MediaPlaybackService {
       if (handler != null) {
         await handler(action);
       } else {
-        _pendingActions
-          ..clear()
-          ..add(action);
+        if (_pendingActions.length == _maxPendingActions) _pendingActions.removeAt(0);
+        _pendingActions.add(action);
       }
     }).catchError((_) {});
   }
