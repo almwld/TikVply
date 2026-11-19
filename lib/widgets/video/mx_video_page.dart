@@ -98,6 +98,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     } catch (error) {
       debugPrint('TikVply media_kit deactivation failed: $error');
     } finally {
+      await MediaPlaybackService.stopAndClear(_mediaOwner);
       _updateWakeLock(false);
     }
   }
@@ -135,7 +136,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       await MediaPlaybackService.stopAndClear(_mediaOwner);
       return;
     }
-    if (playing && settings.backgroundPlayback) {
+    if (playing) {
       await MediaPlaybackService.start(
         title: widget.video.caption ?? 'TikVply',
         playing: true,
