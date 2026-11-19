@@ -45,6 +45,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    settings.addListener(_applySettings);
     _player = Player(
       configuration: const PlayerConfiguration(
         muted: false,
@@ -131,6 +132,18 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _applySettings() async {
+    if (!mounted || !widget.isActive || _failed) return;
+    try {
+      await _player.setRate(settings.playbackSpeed);
+      await _player.setVolume(settings.muted ? 0 : 100);
+      await _player.setPlaylistMode(settings.loop ? PlaylistMode.single : PlaylistMode.none);
+      if (_player.state.playing) _updateWakeLock(true);
+    } catch (error) {
+      debugPrint('TikVply media settings update failed: $error');
+    }
+  }
+
   Future<void> _syncMediaSession(bool playing) async {
     if (!settings.mediaNotifications) {
       await MediaPlaybackService.stopAndClear(_mediaOwner);
@@ -173,7 +186,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
 
       // open() is deliberately bounded: an unreadable file must not keep the
       // UI on a shimmer forever. libmpv performs the actual codec detection.
-      await _player.open(Media(path), play: false).timeout(const Duration(seconds: 15));
+      await _player.open(Media(path), play: false).timeout(const Duration(seconds: 20));
 
       if (!mounted || !widget.isActive || generation != _openGeneration) {
         await _player.stop();
@@ -271,6 +284,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    settings.removeListener(_applySettings);
     _completedSubscription?.cancel();
     _errorSubscription?.cancel();
     _wakeTimer?.cancel();
