@@ -408,13 +408,21 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   }
 
   void _seek(int seconds) {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    final duration = c.value.duration;
-    final target = c.value.position + Duration(seconds: seconds);
-    c.seekTo(target < Duration.zero ? Duration.zero : target > duration ? duration : target);
-    setState(() => _showControls = true);
-    _scheduleHide();
+    unawaited(_enqueueControl(() async {
+      final c = _controller;
+      if (!mounted || !widget.isActive || c == null || !c.value.isInitialized) return;
+      final duration = c.value.duration;
+      final target = c.value.position + Duration(seconds: seconds);
+      final bounded = target < Duration.zero
+          ? Duration.zero
+          : target > duration
+              ? duration
+              : target;
+      await c.seekTo(bounded);
+      if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+      setState(() => _showControls = true);
+      _scheduleHide();
+    }));
   }
 
   void _doubleTap(TapDownDetails details) {
