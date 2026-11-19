@@ -9,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/video/video_model.dart';
 import '../../providers/video_settings_provider.dart';
+import '../../services/media_playback_service.dart';
 
 /// Stable local-media player backed directly by libmpv through media_kit.
 /// This is intentionally separate from the legacy video_player screen so a
@@ -36,6 +37,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   String? _error;
   int _openGeneration = 0;
   Future<void> _pendingDeactivation = Future<void>.value();
+  final Object _mediaOwner = Object();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
 
@@ -70,7 +72,10 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
         _error = message;
       });
     });
-    if (widget.isActive) unawaited(_open());
+    if (widget.isActive) {
+      MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+      unawaited(_open());
+    }
   }
 
   @override
@@ -100,7 +105,45 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   Future<void> _activatePlayer() async {
     await _pendingDeactivation;
     if (!mounted || !widget.isActive) return;
+    MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
     await _open();
+  }
+
+  Future<void> _handleMediaAction(String action) async {
+    if (!mounted || !widget.isActive) return;
+    switch (action) {
+      case 'toggle':
+        await _togglePlay();
+        break;
+      case 'play':
+        if (!_player.state.playing && !_failed) {
+          await _player.play();
+          _updateWakeLock(true);
+          await _syncMediaSession(true);
+        }
+        break;
+      case 'next':
+        widget.onCompleted?.call();
+        break;
+      case 'open':
+        break;
+    }
+  }
+
+  Future<void> _syncMediaSession(bool playing) async {
+    if (!settings.mediaNotifications) {
+      await MediaPlaybackService.stopAndClear(_mediaOwner);
+      return;
+    }
+    if (playing && settings.backgroundPlayback) {
+      await MediaPlaybackService.start(
+        title: widget.video.caption ?? 'TikVply',
+        playing: true,
+        owner: _mediaOwner,
+      );
+    } else {
+      await MediaPlaybackService.update(playing: playing, owner: _mediaOwner);
+    }
   }
 
   Future<void> _open() async {
@@ -147,6 +190,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
           return;
         }
         _updateWakeLock(true);
+        await _syncMediaSession(true);
       }
     } catch (error, stack) {
       debugPrint('TikVply media_kit open failed: $error');
@@ -183,7 +227,9 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   Future<void> _togglePlay() async {
     if (_failed || !widget.isActive) return;
     await _player.playOrPause();
-    _updateWakeLock(_player.state.playing);
+    final playing = _player.state.playing;
+    _updateWakeLock(playing);
+    await _syncMediaSession(playing);
   }
 
   Future<void> _retry() async {
@@ -203,11 +249,21 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     if (!widget.isActive) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       if (!_player.state.playing) return;
-      _player.pause();
-      _updateWakeLock(false);
-    } else if (state == AppLifecycleState.resumed && !_failed && settings.autoplay) {
-      _player.play();
-      _updateWakeLock(true);
+      if (!settings.backgroundPlayback) {
+        unawaited(_player.pause());
+        _updateWakeLock(false);
+        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+      } else {
+        unawaited(_syncMediaSession(true));
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_player.state.playing) {
+        unawaited(_syncMediaSession(true));
+        _updateWakeLock(true);
+      } else if (!_failed && settings.autoplay) {
+        unawaited(_player.play());
+        _updateWakeLock(true);
+      }
     }
   }
 
@@ -218,6 +274,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     _errorSubscription?.cancel();
     _wakeTimer?.cancel();
     WakelockPlus.disable();
+    unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
     _videoController.player.dispose();
     super.dispose();
   }
