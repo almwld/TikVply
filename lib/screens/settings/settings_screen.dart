@@ -78,6 +78,51 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _skipPicker(BuildContext c, VideoSettingsProvider v) async => showModalBottomSheet<void>(context: c, showDragHandle: true, builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [const ListTile(title: Text('مقدار التقديم والرجوع', style: TextStyle(fontWeight: FontWeight.w800))), for (final s in [5, 10, 15, 30, 60]) ListTile(title: Text('$s ثوانٍ'), trailing: v.skipSeconds == s ? const Icon(Icons.check, color: AppColors.primary) : null, onTap: () { v.setSkipSeconds(s); Navigator.pop(c); }), const SizedBox(height: 8)])));
   void _fitPicker(BuildContext c, VideoSettingsProvider v) { final o = <VideoFitMode, String>{VideoFitMode.cover: 'ملء الشاشة', VideoFitMode.contain: 'احتواء كامل', VideoFitMode.fill: 'تمديد'}; showModalBottomSheet<void>(context: c, showDragHandle: true, builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [const ListTile(title: Text('طريقة عرض الفيديو', style: TextStyle(fontWeight: FontWeight.w800))), ...o.entries.map((e) => ListTile(title: Text(e.value), trailing: v.fitMode == e.key ? const Icon(Icons.check, color: AppColors.primary) : null, onTap: () { v.setFitMode(e.key); Navigator.pop(c); })), const SizedBox(height: 8)]))); }
   String _fitLabel(VideoFitMode m) => switch (m) { VideoFitMode.cover => 'ملء الشاشة', VideoFitMode.contain => 'احتواء كامل', VideoFitMode.fill => 'تمديد' };
+  String _enhancementLabel(VideoEnhancement value) => switch (value) {
+        VideoEnhancement.off => 'إيقاف التحسين',
+        VideoEnhancement.light => 'تحسين خفيف',
+        VideoEnhancement.medium => 'تحسين متوسط',
+        VideoEnhancement.strong => 'تحسين قوي',
+      };
+
+  Future<void> _enhancementPicker(BuildContext c, VideoSettingsProvider v) async {
+    const options = <VideoEnhancement, String>{
+      VideoEnhancement.off: 'إيقاف التحسين',
+      VideoEnhancement.light: 'تحسين خفيف',
+      VideoEnhancement.medium: 'تحسين متوسط',
+      VideoEnhancement.strong: 'تحسين قوي',
+    };
+    await showModalBottomSheet<void>(
+      context: c,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('تحسين جودة الفيديو القديم',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('يُطبّق أثناء التشغيل ولا يغيّر الملف الأصلي.'),
+            ),
+            ...options.entries.map(
+              (entry) => ListTile(
+                title: Text(entry.value),
+                trailing: v.videoEnhancement == entry.key
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  v.setVideoEnhancement(entry.key);
+                  Navigator.pop(c);
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _reset(BuildContext c, VideoSettingsProvider v) async { final ok = await showDialog<bool>(context: c, builder: (_) => AlertDialog(title: const Text('إعادة إعدادات المشغل؟'), content: const Text('سيتم إرجاع جميع إعدادات الفيديو إلى القيم الافتراضية.'), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('إعادة'))])); if (ok == true) { await v.reset(); if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('تمت إعادة الإعدادات'))); } }
   void _info(BuildContext c, String title, String text) => showDialog<void>(context: c, builder: (_) => AlertDialog(title: Text(title), content: Text(text), actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('حسنًا'))]));
 }
