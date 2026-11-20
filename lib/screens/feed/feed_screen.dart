@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/notification_provider.dart';
@@ -68,7 +67,16 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onTabTapped(int index) {
     if (index == 2) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()));
+      final previousIndex = _currentIndex;
+      setState(() => _currentIndex = 2);
+      _pageController.jumpToPage(2);
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen()))
+          .whenComplete(() {
+        if (!mounted) return;
+        setState(() => _currentIndex = previousIndex);
+        _pageController.jumpToPage(previousIndex);
+      });
       return;
     }
     _setBottomBarVisible(true);
@@ -98,7 +106,7 @@ class _MainScreenState extends State<MainScreen> {
               _setBottomBarVisible(true);
             },
             children: [
-              FeedScreen(onVerticalPageChanged: _onFeedPageChanged),
+              FeedScreen(onVerticalPageChanged: _onFeedPageChanged, isTabActive: _currentIndex == 0),
               const SearchScreen(),
               const SizedBox.shrink(),
               const NotificationsScreen(),
@@ -182,8 +190,9 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key, this.onVerticalPageChanged});
+  const FeedScreen({super.key, this.onVerticalPageChanged, this.isTabActive = true});
   final ValueChanged<double>? onVerticalPageChanged;
+  final bool isTabActive;
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
@@ -193,6 +202,7 @@ class _FeedScreenState extends State<FeedScreen> {
   bool _following = false;
   bool _isScrolling = false;
   int _activeIndex = 0;
+  bool _routeCovered = false;
 
   @override
   void initState() {
@@ -211,6 +221,18 @@ class _FeedScreenState extends State<FeedScreen> {
     if (_controller.hasClients && _controller.page != null) widget.onVerticalPageChanged?.call(_controller.page!);
   }
 
+  Future<void> _openMediaBrowser() async {
+    if (!mounted || _routeCovered) return;
+    setState(() => _routeCovered = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
+      );
+    } finally {
+      if (mounted) setState(() => _routeCovered = false);
+    }
+  }
+
   void _openNext(VideoProvider videos) {
     final next = _activeIndex + 1;
     if (next < videos.videos.length && _controller.hasClients) {
@@ -221,7 +243,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) => Consumer<VideoProvider>(
     builder: (context, videos, _) {
-      if (videos.isLoading && videos.videos.isEmpty) return const _FeedLoadingShimmer();
+      if (videos.isLoading && videos.videos.isEmpty) return const ColoredBox(color: Colors.black, child: Center(child: CircularProgressIndicator(color: Colors.white70)));
       return ColoredBox(
         color: Colors.black,
         child: Stack(fit: StackFit.expand, children: [
@@ -256,7 +278,7 @@ class _FeedScreenState extends State<FeedScreen> {
               itemBuilder: (_, i) => VideoPage(
                 key: ValueKey(videos.videos[i].id),
                 video: videos.videos[i],
-                isActive: !_isScrolling && i == _activeIndex,
+                isActive: widget.isTabActive && !_routeCovered && !_isScrolling && i == _activeIndex,
                 onCompleted: context.read<VideoSettingsProvider>().autoNext ? () => _openNext(videos) : null,
               ),
             ),
@@ -270,8 +292,8 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget _topBar(BuildContext context, VideoProvider videos) => SizedBox(
     height: 68,
     child: Stack(alignment: Alignment.topCenter, children: [
-      PositionedDirectional(start: 10, top: 6, child: _topIconButton(tooltip: 'تحديث فيديوهات الهاتف', icon: videos.isRefreshing ? null : Icons.sync_rounded, onPressed: videos.isRefreshing ? null : videos.refreshDeviceVideos, child: videos.isRefreshing ? const SizedBox(width: 19, height: 19, child: _MiniShimmer()) : null)),
-      PositionedDirectional(end: 10, top: 6, child: _topIconButton(tooltip: 'مكتبة الفيديو', icon: Icons.video_library_rounded, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MediaBrowserScreen())))),
+      PositionedDirectional(start: 10, top: 6, child: _topIconButton(tooltip: 'تحديث فيديوهات الهاتف', icon: videos.isRefreshing ? null : Icons.sync_rounded, onPressed: videos.isRefreshing ? null : videos.refreshDeviceVideos, child: videos.isRefreshing ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)) : null)),
+      PositionedDirectional(end: 10, top: 6, child: _topIconButton(tooltip: 'مكتبة الفيديو', icon: Icons.video_library_rounded, onPressed: _openMediaBrowser)),
       Center(child: Container(margin: const EdgeInsets.only(top: 6), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4), decoration: BoxDecoration(color: Colors.black.withValues(alpha: .28), borderRadius: BorderRadius.circular(22), border: Border.all(color: Colors.white.withValues(alpha: .10))), child: Row(mainAxisSize: MainAxisSize.min, children: [_tab(context, 'لك', !_following, () => setState(() => _following = false)), const SizedBox(width: 2), _tab(context, 'أتابع', _following, () => setState(() => _following = true))]))),
     ]),
   );
@@ -281,5 +303,3 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget _emptyState(BuildContext context, VideoProvider videos) => Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.video_library_rounded, color: Colors.white, size: 74), const SizedBox(height: 18), const Text('مكتبة الفيديو فارغة', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)), const SizedBox(height: 8), Text(videos.error ?? 'سيبحث التطبيق تلقائيًا عن فيديوهات الهاتف ويعرضها هنا.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5)), const SizedBox(height: 26), FilledButton.icon(onPressed: videos.refreshDeviceVideos, icon: const Icon(Icons.sync), label: const Text('تحديث مكتبة الهاتف'))])));
 }
 
-class _FeedLoadingShimmer extends StatelessWidget { const _FeedLoadingShimmer(); @override Widget build(BuildContext context) => Shimmer.fromColors(baseColor: const Color(0xFF101817), highlightColor: const Color(0xFF2B3836), period: const Duration(milliseconds: 1150), child: Stack(fit: StackFit.expand, children: [const ColoredBox(color: Color(0xFF171F1E)), Center(child: Container(width: 88, height: 88, decoration: const BoxDecoration(color: Color(0xFF26302F), shape: BoxShape.circle))), Positioned(left: 16, right: 88, bottom: 110, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 200, height: 15, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))), const SizedBox(height: 10), Container(width: 145, height: 12, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(8))), const SizedBox(height: 9), Container(width: 225, height: 9, decoration: BoxDecoration(color: Color(0xFF293331), borderRadius: BorderRadius.circular(6)))])), Positioned(right: 14, bottom: 130, child: Column(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsets.only(bottom: 15), child: Container(width: 45, height: 45, decoration: const BoxDecoration(color: Color(0xFF293331), shape: BoxShape.circle)))]))])); }
-class _MiniShimmer extends StatelessWidget { const _MiniShimmer(); @override Widget build(BuildContext context) => Shimmer.fromColors(baseColor: Colors.white38, highlightColor: Colors.white, child: const CircleAvatar(radius: 9, backgroundColor: Colors.white)); }

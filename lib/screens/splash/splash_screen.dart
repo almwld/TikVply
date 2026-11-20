@@ -15,33 +15,43 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
-  bool _skipSplash = false;
+  bool _navigationStarted = false;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this)..forward();
-    _gateSplash();
+    _initializeSplash();
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: const Interval(0, .6, curve: Curves.easeIn));
     _scaleAnimation = Tween<double>(begin: .86, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0, .75, curve: Curves.easeOutCubic)));
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted && !_skipSplash) Navigator.pushReplacementNamed(context, AppRoutes.main);
-    });
   }
 
   static const _lastShownKey = 'splash_last_shown_at_v1';
 
-  Future<void> _gateSplash() async {
-    final prefs = await SharedPreferences.getInstance();
-    final last = prefs.getInt(_lastShownKey);
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final shouldShow = last == null || now - last >= const Duration(hours: 12).inMilliseconds;
-    if (!shouldShow) {
-      _skipSplash = true;
-      if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.main);
-      return;
+  Future<void> _initializeSplash() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getInt(_lastShownKey);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final shouldShow = last == null || now - last >= const Duration(hours: 12).inMilliseconds;
+      if (!shouldShow) {
+        _navigateToMain();
+        return;
+      }
+      await prefs.setInt(_lastShownKey, now);
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      _navigateToMain();
+    } catch (error) {
+      debugPrint('TikVply splash initialization failed: $error');
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      _navigateToMain();
     }
-    await prefs.setInt(_lastShownKey, now);
+  }
+
+  void _navigateToMain() {
+    if (!mounted || _navigationStarted) return;
+    _navigationStarted = true;
+    Navigator.pushReplacementNamed(context, AppRoutes.main);
   }
 
   @override

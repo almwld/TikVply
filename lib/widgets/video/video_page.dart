@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/constants/app_colors.dart';
@@ -44,9 +43,12 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Duration? _a;
   Duration? _b;
   int? _sleepMinutes;
+  double? _scrubPositionMs;
+  bool _abSeeking = false;
   final Object _mediaOwner = Object();
   int _openGeneration = 0;
   Future<void> _controlQueue = Future<void>.value();
+  Future<void> _pendingDeactivation = Future<void>.value();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
   bool get _network => widget.video.videoUrl.startsWith('http://') || widget.video.videoUrl.startsWith('https://');
@@ -67,26 +69,45 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     if (widget.isActive != oldWidget.isActive) {
       final c = _controller;
       if (widget.isActive) {
-        MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
-        if (c == null || !c.value.isInitialized) {
-          _open();
-        } else if (settings.autoplay && !c.value.isPlaying) {
-          unawaited(_resumeActiveController(c));
-        }
+        unawaited(_activateAfterDeactivation());
       } else {
         _openGeneration++;
-        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
-        if (c != null) {
-          c.pause();
-          if (c.value.isInitialized) _savePosition(c.value.position);
-          c.removeListener(_listener);
-          c.dispose();
-          _controller = null;
-        }
+        _pendingDeactivation = _deactivateController(c);
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _activateAfterDeactivation() async {
+    await _pendingDeactivation;
+    if (!mounted || !widget.isActive) return;
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      await _open();
+      return;
+    }
+    MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+    if (settings.autoplay && !controller.value.isPlaying) {
+      await _resumeActiveController(controller);
+    }
+  }
+
+  Future<void> _deactivateController(VideoPlayerController? controller) async {
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
+    if (controller == null) return;
+    try {
+      if (controller.value.isInitialized) {
+        await controller.pause();
+        _savePosition(controller.value.position);
+      }
+    } catch (error) {
+      debugPrint('TikVply player pause during deactivation failed: $error');
+    } finally {
+      controller.removeListener(_listener);
+      if (identical(_controller, controller)) _controller = null;
+      await controller.dispose();
     }
   }
 
@@ -141,6 +162,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       await previous.dispose();
     }
     if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    await _pendingDeactivation;
+    if (!mounted || generation != _openGeneration || !widget.isActive) return;
     VideoPlayerController? controller;
     try {
       controller = _network
@@ -148,7 +171,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
           : VideoPlayerController.file(File(widget.video.videoUrl), videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true, mixWithOthers: false));
       _controller = controller;
       controller.addListener(_listener);
-      await controller.initialize();
+      await controller.initialize().timeout(const Duration(seconds: 20));
       if (!controller.value.isInitialized || controller.value.duration <= Duration.zero) throw StateError('invalid video');
       await _applySettings();
       final saved = await _playback.loadPosition(widget.video.id);
@@ -222,8 +245,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
     final position = c.value.position;
     final duration = c.value.duration;
-    if (_a != null && _b != null && position >= _b! - const Duration(milliseconds: 100)) {
-      c.seekTo(_a!);
+    if (_a != null && _b != null && position >= _b! - const Duration(milliseconds: 100) && !_abSeeking) {
+      _abSeeking = true;
+      unawaited(_seekTo(_a!).whenComplete(() => _abSeeking = false));
       return;
     }
     if (!settings.loop && !_completionSent && duration > Duration.zero && position >= duration - const Duration(milliseconds: 250)) {
@@ -386,14 +410,28 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _seekTo(Duration target) => _enqueueControl(() async {
+    final c = _controller;
+    if (!mounted || !widget.isActive || c == null || !c.value.isInitialized) return;
+    final duration = c.value.duration;
+    final bounded = target < Duration.zero
+        ? Duration.zero
+        : target > duration
+            ? duration
+            : target;
+    await c.seekTo(bounded);
+    if (!mounted || !widget.isActive || !identical(_controller, c)) return;
+    setState(() {
+      _scrubPositionMs = null;
+      _showControls = true;
+    });
+    _scheduleHide();
+  });
+
   void _seek(int seconds) {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    final duration = c.value.duration;
-    final target = c.value.position + Duration(seconds: seconds);
-    c.seekTo(target < Duration.zero ? Duration.zero : target > duration ? duration : target);
-    setState(() => _showControls = true);
-    _scheduleHide();
+    unawaited(_seekTo(c.value.position + Duration(seconds: seconds)));
   }
 
   void _doubleTap(TapDownDetails details) {
@@ -457,10 +495,17 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _sleepMinutes = minutes;
     if (minutes != null) {
       _sleepTimer = Timer(Duration(minutes: minutes), () {
-        _controller?.pause();
-        _sleepMinutes = null;
-        WakelockPlus.disable();
-        if (mounted) setState(() {});
+        unawaited(_enqueueControl(() async {
+          final c = _controller;
+          if (c != null && c.value.isInitialized && c.value.isPlaying) {
+            await c.pause();
+            _lastPlaying = false;
+            await _syncWakelock();
+            await MediaPlaybackService.update(playing: false, owner: _mediaOwner);
+          }
+          _sleepMinutes = null;
+          if (mounted) setState(() {});
+        }));
       });
     }
     setState(() {});
@@ -546,7 +591,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_loading || _controller == null || !_controller!.value.isInitialized) const _VideoLoadingShimmer() else _video(),
+            if (_loading || _controller == null || !_controller!.value.isInitialized) const _VideoLoadingIndicator() else _video(),
             if (!_loading && _controller != null && _controller!.value.isInitialized && !_locked) _controls(),
             if (_locked)
               Positioned(
@@ -579,7 +624,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         child: ValueListenableBuilder<VideoPlayerValue>(
           valueListenable: c,
           builder: (_, value, __) {
-            if (!value.isInitialized) return const _VideoLoadingShimmer();
+            if (!value.isInitialized) return const _VideoLoadingIndicator();
             final fit = switch (settings.fitMode) {
               VideoFitMode.cover => BoxFit.cover,
               VideoFitMode.contain => BoxFit.contain,
@@ -768,10 +813,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
                         child: Slider(
                           min: 0,
                           max: maxMs,
-                          value: positionMs,
-                          onChanged: (position) {
-                            _controller?.seekTo(Duration(milliseconds: position.round()));
-                          },
+                          value: (_scrubPositionMs ?? positionMs).clamp(0.0, maxMs),
+                          onChanged: (position) => setState(() => _scrubPositionMs = position),
+                          onChangeEnd: (position) => unawaited(_seekTo(Duration(milliseconds: position.round()))),
                         ),
                       ),
                     ),
@@ -811,8 +855,11 @@ class _TopGradient extends StatelessWidget {
   Widget build(BuildContext context) => Container(height: 140, decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent])));
 }
 
-class _VideoLoadingShimmer extends StatelessWidget {
-  const _VideoLoadingShimmer();
+class _VideoLoadingIndicator extends StatelessWidget {
+  const _VideoLoadingIndicator();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(baseColor: const Color(0xFF101817), highlightColor: const Color(0xFF2B3836), child: const ColoredBox(color: Color(0xFF171F1E)));
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFF101817),
+    child: Center(child: CircularProgressIndicator(color: Colors.white70)),
+  );
 }

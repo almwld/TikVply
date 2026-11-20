@@ -5,14 +5,14 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_thumbnail_service.dart';
 import '../../widgets/app_bar/tikvply_app_bar.dart';
-import '../../widgets/video/video_page.dart';
+import '../../widgets/video/mx_video_page.dart';
+import 'media_folder_browser_screen.dart';
 
 class MediaBrowserScreen extends StatefulWidget {
   const MediaBrowserScreen({super.key});
@@ -70,13 +70,22 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> with WidgetsBin
         child: Scaffold(
           appBar: TikVplyAppBar(
             title: 'وسائط الهاتف',
-            actions: [Consumer<VideoProvider>(builder: (_, provider, __) => IconButton(
-              tooltip: 'تحديث المكتبة',
-              onPressed: provider.isRefreshing ? null : () => _refreshIfNeeded(force: true),
-              icon: provider.isRefreshing
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.sync_rounded),
-            ))],
+            actions: [
+              IconButton(
+                tooltip: 'تصفح المجلدات',
+                icon: const Icon(Icons.folder_open_rounded),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const MediaFolderBrowserScreen(),
+                )),
+              ),
+              Consumer<VideoProvider>(builder: (_, provider, __) => IconButton(
+                tooltip: 'تحديث المكتبة',
+                onPressed: provider.isRefreshing ? null : () => _refreshIfNeeded(force: true),
+                icon: provider.isRefreshing
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.sync_rounded),
+              )),
+            ],
           ),
           body: Consumer<VideoProvider>(builder: (_, provider, __) {
             final videos = _prepare(provider.videos);
@@ -277,10 +286,11 @@ class _ThumbnailState extends State<_Thumbnail> {
 class _MediaLoadingGrid extends StatelessWidget {
   const _MediaLoadingGrid();
   @override
-  Widget build(BuildContext context) => Shimmer.fromColors(
-    baseColor: Colors.black12,
-    highlightColor: Colors.white70,
-    child: GridView.builder(padding: const EdgeInsets.all(5), itemCount: 18, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4), itemBuilder: (_, __) => const ColoredBox(color: Colors.white)),
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFF101820),
+    child: Center(
+      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+    ),
   );
 }
 
@@ -348,7 +358,7 @@ class _MediaViewerState extends State<_MediaViewer> {
             if (mounted) setState(() => _activeIndex = index);
           },
           itemCount: widget.videos.length,
-          itemBuilder: (_, index) => VideoPage(
+          itemBuilder: (_, index) => MxVideoPage(
             key: ValueKey(widget.videos[index].id),
             video: widget.videos[index],
             isActive: !_isScrolling && index == _activeIndex,

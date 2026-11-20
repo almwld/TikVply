@@ -59,7 +59,14 @@ class VideoThumbnailService {
 
       final directory = await _directory();
       final stat = await video.stat();
-      final key = '${videoPath.hashCode.toRadixString(16)}_${stat.size}_${stat.modified.millisecondsSinceEpoch}';
+      // Object.hashCode is not a persistent cache key across app launches.
+      // FNV-1a keeps the path component deterministic on every run.
+      var pathHash = 0xcbf29ce484222325;
+      for (final unit in videoPath.codeUnits) {
+        pathHash ^= unit;
+        pathHash = (pathHash * 0x100000001b3) & 0xffffffffffffffff;
+      }
+      final key = '${pathHash.toRadixString(16).padLeft(16, '0')}_${stat.size}_${stat.modified.millisecondsSinceEpoch}';
       final thumbnail = File('${directory.path}/$key.jpg');
       if (await thumbnail.exists() && await thumbnail.length() > 0) return thumbnail.path;
 

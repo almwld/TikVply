@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum VideoFitMode { cover, contain, fill }
 
+enum VideoEnhancement { off, light, medium, strong }
+
 class VideoSettingsProvider extends ChangeNotifier {
   static const _speedKey = 'video_speed';
   static const _fitKey = 'video_fit';
@@ -15,6 +17,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   static const _wakelockKey = 'video_wakelock';
   static const _backgroundPlaybackKey = 'video_background_playback';
   static const _skipKey = 'video_skip_seconds';
+  static const _enhancementKey = 'video_enhancement';
 
   double _playbackSpeed = 1.0;
   VideoFitMode _fitMode = VideoFitMode.cover;
@@ -27,6 +30,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool _keepScreenAwake = true;
   bool _backgroundPlayback = false;
   int _skipSeconds = 10;
+  VideoEnhancement _videoEnhancement = VideoEnhancement.off;
 
   double get playbackSpeed => _playbackSpeed;
   VideoFitMode get fitMode => _fitMode;
@@ -39,6 +43,7 @@ class VideoSettingsProvider extends ChangeNotifier {
   bool get keepScreenAwake => _keepScreenAwake;
   bool get backgroundPlayback => _backgroundPlayback;
   int get skipSeconds => _skipSeconds;
+  VideoEnhancement get videoEnhancement => _videoEnhancement;
 
   VideoSettingsProvider() { _load(); }
 
@@ -56,6 +61,11 @@ class VideoSettingsProvider extends ChangeNotifier {
     _keepScreenAwake = prefs.getBool(_wakelockKey) ?? true;
     _backgroundPlayback = prefs.getBool(_backgroundPlaybackKey) ?? false;
     _skipSeconds = prefs.getInt(_skipKey) ?? 10;
+    final enhancement = prefs.getString(_enhancementKey) ?? VideoEnhancement.off.name;
+    _videoEnhancement = VideoEnhancement.values.firstWhere(
+      (value) => value.name == enhancement,
+      orElse: () => VideoEnhancement.off,
+    );
     notifyListeners();
   }
 
@@ -75,6 +85,16 @@ class VideoSettingsProvider extends ChangeNotifier {
   Future<void> setMediaNotifications(bool value) async => _saveBool(_notificationsKey, _mediaNotifications = value);
   Future<void> setKeepScreenAwake(bool value) async => _saveBool(_wakelockKey, _keepScreenAwake = value);
   Future<void> setBackgroundPlayback(bool value) async => _saveBool(_backgroundPlaybackKey, _backgroundPlayback = value);
+
+  Future<void> setVideoEnhancement(VideoEnhancement value) async =>
+      _saveEnhancement(value);
+
+  Future<void> _saveEnhancement(VideoEnhancement value) async {
+    _videoEnhancement = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_enhancementKey, value.name);
+  }
 
   Future<void> setSkipSeconds(int value) async {
     _skipSeconds = value.clamp(5, 60);
@@ -107,9 +127,10 @@ class VideoSettingsProvider extends ChangeNotifier {
     _keepScreenAwake = true;
     _backgroundPlayback = false;
     _skipSeconds = 10;
+    _videoEnhancement = VideoEnhancement.off;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    for (final key in [_speedKey, _fitKey, _mutedKey, _autoplayKey, _loopKey, _autoNextKey, _gesturesKey, _notificationsKey, _wakelockKey, _backgroundPlaybackKey, _skipKey]) {
+    for (final key in [_speedKey, _fitKey, _mutedKey, _autoplayKey, _loopKey, _autoNextKey, _gesturesKey, _notificationsKey, _wakelockKey, _backgroundPlaybackKey, _skipKey, _enhancementKey]) {
       await prefs.remove(key);
     }
   }

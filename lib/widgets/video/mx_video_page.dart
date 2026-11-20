@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/video/video_model.dart';
 import '../../providers/video_settings_provider.dart';
+import '../../services/media_playback_service.dart';
 
 /// Stable local-media player backed directly by libmpv through media_kit.
 /// This is intentionally separate from the legacy video_player screen so a
@@ -16,8 +18,9 @@ import '../../providers/video_settings_provider.dart';
 class MxVideoPage extends StatefulWidget {
   final VideoModel video;
   final VoidCallback? onCompleted;
+  final bool isActive;
 
-  const MxVideoPage({super.key, required this.video, this.onCompleted});
+  const MxVideoPage({super.key, required this.video, this.onCompleted, this.isActive = true});
 
   @override
   State<MxVideoPage> createState() => _MxVideoPageState();
@@ -33,6 +36,9 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   bool _failed = false;
   bool _completedSent = false;
   String? _error;
+  int _openGeneration = 0;
+  Future<void> _pendingDeactivation = Future<void>.value();
+  final Object _mediaOwner = Object();
 
   VideoSettingsProvider get settings => context.read<VideoSettingsProvider>();
 
@@ -40,6 +46,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    settings.addListener(_applySettings);
     _player = Player(
       configuration: const PlayerConfiguration(
         muted: false,
@@ -48,18 +55,21 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     _videoController = VideoController(
       _player,
       configuration: const VideoControllerConfiguration(
+        // Prefer Android MediaCodec so supported H.264/HEVC streams are decoded
+        // by the device hardware instead of consuming the application CPU.
         enableHardwareAcceleration: true,
+        hwdec: 'mediacodec',
         scale: 1.0,
       ),
     );
     _completedSubscription = _player.stream.completed.listen((completed) {
-      if (completed && !_completedSent) {
+      if (completed && widget.isActive && !_completedSent) {
         _completedSent = true;
         widget.onCompleted?.call();
       }
     });
     _errorSubscription = _player.stream.error.listen((message) {
-      if (!mounted || message.isEmpty) return;
+      if (!mounted || !widget.isActive || message.isEmpty) return;
       debugPrint('TikVply media_kit error: $message');
       setState(() {
         _loading = false;
@@ -67,10 +77,129 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
         _error = message;
       });
     });
-    _open();
+    if (widget.isActive) {
+      MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+      unawaited(_open());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant MxVideoPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    if (widget.isActive) {
+      unawaited(_activatePlayer());
+    } else {
+      _openGeneration++;
+      _pendingDeactivation = _deactivatePlayer();
+      _updateWakeLock(false);
+    }
+  }
+
+  Future<void> _deactivatePlayer() async {
+    try {
+      await _player.pause();
+      await _player.stop();
+    } catch (error) {
+      debugPrint('TikVply media_kit deactivation failed: $error');
+    } finally {
+      await MediaPlaybackService.stopAndClear(_mediaOwner);
+      _updateWakeLock(false);
+    }
+  }
+
+  Future<void> _activatePlayer() async {
+    await _pendingDeactivation;
+    if (!mounted || !widget.isActive) return;
+    MediaPlaybackService.setActiveHandler(_handleMediaAction, owner: _mediaOwner);
+    await _open();
+  }
+
+  Future<void> _handleMediaAction(String action) async {
+    if (!mounted || !widget.isActive) return;
+    switch (action) {
+      case 'toggle':
+        await _togglePlay();
+        break;
+      case 'play':
+        if (!_player.state.playing && !_failed) {
+          await _player.play();
+          _updateWakeLock(true);
+          await _syncMediaSession(true);
+        }
+        break;
+      case 'next':
+        widget.onCompleted?.call();
+        break;
+      case 'open':
+        break;
+    }
+  }
+
+  Future<void> _applySettings() async {
+    if (!mounted || !widget.isActive || _failed) return;
+    try {
+      await _player.setRate(settings.playbackSpeed);
+      await _player.setVolume(settings.muted ? 0 : 100);
+      await _player.setPlaylistMode(settings.loop ? PlaylistMode.single : PlaylistMode.none);
+      await _applyVideoEnhancement();
+      if (_player.state.playing) _updateWakeLock(true);
+    } catch (error) {
+      debugPrint('TikVply media settings update failed: $error');
+    }
+  }
+
+
+  /// Applies optional libmpv filters to decoded frames. Hardware decoding
+  /// remains enabled, but lavfi post-processing may use CPU resources.
+  Future<void> _applyVideoEnhancement() async {
+    if (!mounted || !widget.isActive) return;
+    final filter = switch (settings.videoEnhancement) {
+      VideoEnhancement.off => '',
+      VideoEnhancement.light =>
+        'lavfi=[hqdn3d=1.0:1.0:3.0:3.0,unsharp=5:5:0.35:5:5:0.0]',
+      VideoEnhancement.medium =>
+        'lavfi=[hqdn3d=1.5:1.5:5.0:5.0,unsharp=5:5:0.55:5:5:0.0]',
+      VideoEnhancement.strong =>
+        'lavfi=[hqdn3d=2.0:2.0:7.0:7.0,unsharp=5:5:0.75:5:5:0.0]',
+    };
+    try {
+      final platformPlayer = _player.platform;
+      if (platformPlayer is NativePlayer) {
+        await platformPlayer.setProperty('vf', filter);
+      }
+    } catch (error) {
+      // Optional processing must never interrupt video playback.
+      debugPrint('TikVply video enhancement unavailable: $error');
+    }
+  }
+
+  Future<void> _syncMediaSession(bool playing) async {
+    if (!settings.mediaNotifications) {
+      await MediaPlaybackService.stopAndClear(_mediaOwner);
+      return;
+    }
+    if (playing) {
+      await MediaPlaybackService.start(
+        title: widget.video.caption ?? 'TikVply',
+        playing: true,
+        owner: _mediaOwner,
+      );
+    } else {
+      await MediaPlaybackService.update(playing: playing, owner: _mediaOwner);
+    }
   }
 
   Future<void> _open() async {
+    final generation = ++_openGeneration;
+    await _pendingDeactivation;
+    if (!mounted || !widget.isActive || generation != _openGeneration) return;
+    _completedSent = false;
+    setState(() {
+      _loading = true;
+      _failed = false;
+      _error = null;
+    });
     final path = widget.video.videoUrl;
     try {
       if (!path.startsWith('http://') && !path.startsWith('https://')) {
@@ -84,12 +213,16 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       await _player.setRate(settings.playbackSpeed);
       await _player.setVolume(settings.muted ? 0 : 100);
       await _player.setPlaylistMode(settings.loop ? PlaylistMode.single : PlaylistMode.none);
+      await _applyVideoEnhancement();
 
       // open() is deliberately bounded: an unreadable file must not keep the
       // UI on a shimmer forever. libmpv performs the actual codec detection.
-      await _player.open(Media(path), play: false).timeout(const Duration(seconds: 15));
+      await _player.open(Media(path), play: false).timeout(const Duration(seconds: 20));
 
-      if (!mounted) return;
+      if (!mounted || !widget.isActive || generation != _openGeneration) {
+        await _player.stop();
+        return;
+      }
       setState(() {
         _loading = false;
         _failed = false;
@@ -97,26 +230,33 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
 
       if (settings.autoplay) {
         await _player.play();
+        if (!mounted || !widget.isActive || generation != _openGeneration) {
+          await _player.pause();
+          return;
+        }
         _updateWakeLock(true);
+        await _syncMediaSession(true);
       }
     } catch (error, stack) {
       debugPrint('TikVply media_kit open failed: $error');
       debugPrintStack(stackTrace: stack);
-      if (!mounted) return;
+      if (!mounted || !widget.isActive || generation != _openGeneration) return;
       setState(() {
         _loading = false;
         _failed = true;
         _error = 'تعذر تشغيل هذا الملف';
       });
-      _completeAfterFailure();
+      _completeAfterFailure(generation);
     }
   }
 
-  void _completeAfterFailure() {
+  void _completeAfterFailure(int generation) {
     if (_completedSent || widget.onCompleted == null) return;
     _completedSent = true;
     Future<void>.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) widget.onCompleted?.call();
+      if (mounted && widget.isActive && generation == _openGeneration) {
+        widget.onCompleted?.call();
+      }
     });
   }
 
@@ -130,12 +270,15 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   }
 
   Future<void> _togglePlay() async {
-    if (_failed) return;
+    if (_failed || !widget.isActive) return;
     await _player.playOrPause();
-    _updateWakeLock(_player.state.playing);
+    final playing = _player.state.playing;
+    _updateWakeLock(playing);
+    await _syncMediaSession(playing);
   }
 
   Future<void> _retry() async {
+    if (!widget.isActive) return;
     _completedSent = false;
     setState(() {
       _loading = true;
@@ -148,23 +291,36 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.isActive) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       if (!_player.state.playing) return;
-      _player.pause();
-      _updateWakeLock(false);
-    } else if (state == AppLifecycleState.resumed && !_failed && settings.autoplay) {
-      _player.play();
-      _updateWakeLock(true);
+      if (!settings.backgroundPlayback) {
+        unawaited(_player.pause());
+        _updateWakeLock(false);
+        unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+      } else {
+        unawaited(_syncMediaSession(true));
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_player.state.playing) {
+        unawaited(_syncMediaSession(true));
+        _updateWakeLock(true);
+      } else if (!_failed && settings.autoplay) {
+        unawaited(_player.play());
+        _updateWakeLock(true);
+      }
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    settings.removeListener(_applySettings);
     _completedSubscription?.cancel();
     _errorSubscription?.cancel();
     _wakeTimer?.cancel();
     WakelockPlus.disable();
+    unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
     _videoController.player.dispose();
     super.dispose();
   }
@@ -176,8 +332,14 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (!_failed) Video(controller: _videoController, controls: AdaptiveVideoControls),
-          if (_loading) const _LoadingOverlay(),
+          // Do not attach an inactive PageView neighbour to a native video
+          // surface. Keeping only the active page attached reduces Surface /
+          // GPU work and avoids competing decoder/render pipelines while swiping.
+          if (!_failed && widget.isActive)
+            Video(controller: _videoController, controls: AdaptiveVideoControls),
+          // Show the loading shimmer only for the active player. PageView marks
+          // every page inactive during a swipe, so no shimmer flashes between videos.
+          if (_loading && widget.isActive) const _VideoLoadingShimmer(),
           if (_failed) _FailureOverlay(message: _error, onRetry: _retry),
           Positioned(
             top: MediaQuery.paddingOf(context).top + 6,
@@ -210,13 +372,14 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   }
 }
 
-class _LoadingOverlay extends StatelessWidget {
-  const _LoadingOverlay();
+class _VideoLoadingShimmer extends StatelessWidget {
+  const _VideoLoadingShimmer();
 
   @override
-  Widget build(BuildContext context) => const ColoredBox(
-        color: Colors.black,
-        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+  Widget build(BuildContext context) => Shimmer.fromColors(
+        baseColor: const Color(0xFF101817),
+        highlightColor: const Color(0xFF2B3836),
+        child: const ColoredBox(color: Color(0xFF171F1E)),
       );
 }
 
