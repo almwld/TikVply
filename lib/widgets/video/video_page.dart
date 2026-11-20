@@ -140,7 +140,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       previous.removeListener(_listener);
       await previous.dispose();
     }
-    if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    // A newer page activation/open may have superseded this asynchronous
+    // disposal. Never create a controller for an obsolete generation.
+    if (!mounted || generation != _openGeneration || !widget.isActive) return;
+    setState(() => _loading = true);
     VideoPlayerController? controller;
     try {
       controller = _network
