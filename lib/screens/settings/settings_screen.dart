@@ -41,6 +41,7 @@ class SettingsScreen extends StatelessWidget {
               ListTile(leading: const Icon(Icons.speed, color: AppColors.primary), title: const Text('سرعة التشغيل'), subtitle: Text('${video.playbackSpeed}x'), trailing: const Icon(Icons.chevron_left), onTap: () => _speedPicker(context, video)),
               ListTile(leading: const Icon(Icons.fast_forward_rounded, color: AppColors.primary), title: const Text('مقدار التقديم والرجوع'), subtitle: Text('${video.skipSeconds} ثوانٍ'), trailing: const Icon(Icons.chevron_left), onTap: () => _skipPicker(context, video)),
               ListTile(leading: const Icon(Icons.aspect_ratio_outlined, color: AppColors.primary), title: const Text('طريقة العرض'), subtitle: Text(_fitLabel(video.fitMode)), trailing: const Icon(Icons.chevron_left), onTap: () => _fitPicker(context, video)),
+              ListTile(leading: const Icon(Icons.high_quality_outlined, color: AppColors.primary), title: const Text('تحسين جودة الفيديو القديم'), subtitle: Text(_enhancementLabel(video.videoEnhancement)), trailing: const Icon(Icons.chevron_left), onTap: () => _enhancementPicker(context, video)),
             ])),
             _section('المشغل المتقدم'),
             Card(child: const ListTile(
