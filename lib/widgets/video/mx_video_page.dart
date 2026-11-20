@@ -160,7 +160,10 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
         'lavfi=[hqdn3d=2.0:2.0:7.0:7.0,unsharp=5:5:0.75:5:5:0.0]',
     };
     try {
-      await _player.setProperty('vf', filter);
+      final platformPlayer = _player.platform;
+      if (platformPlayer is NativePlayer) {
+        await platformPlayer.setProperty('vf', filter);
+      }
     } catch (error) {
       // Optional processing must never interrupt video playback.
       debugPrint('TikVply video enhancement unavailable: $error');
