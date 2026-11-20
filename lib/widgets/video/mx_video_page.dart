@@ -54,7 +54,10 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
     _videoController = VideoController(
       _player,
       configuration: const VideoControllerConfiguration(
+        // Prefer Android MediaCodec so supported H.264/HEVC streams are decoded
+        // by the device hardware instead of consuming the application CPU.
         enableHardwareAcceleration: true,
+        hwdec: 'mediacodec',
         scale: 1.0,
       ),
     );
@@ -328,7 +331,11 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (!_failed) Video(controller: _videoController, controls: AdaptiveVideoControls),
+          // Do not attach an inactive PageView neighbour to a native video
+          // surface. Keeping only the active page attached reduces Surface /
+          // GPU work and avoids competing decoder/render pipelines while swiping.
+          if (!_failed && widget.isActive)
+            Video(controller: _videoController, controls: AdaptiveVideoControls),
           if (_loading) const _LoadingOverlay(),
           if (_failed) _FailureOverlay(message: _error, onRetry: _retry),
           Positioned(
