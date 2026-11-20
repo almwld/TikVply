@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../models/video/video_model.dart';
@@ -336,7 +337,9 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
           // GPU work and avoids competing decoder/render pipelines while swiping.
           if (!_failed && widget.isActive)
             Video(controller: _videoController, controls: AdaptiveVideoControls),
-          if (_loading) const _LoadingOverlay(),
+          // Show the loading shimmer only for the active player. PageView marks
+          // every page inactive during a swipe, so no shimmer flashes between videos.
+          if (_loading && widget.isActive) const _VideoLoadingShimmer(),
           if (_failed) _FailureOverlay(message: _error, onRetry: _retry),
           Positioned(
             top: MediaQuery.paddingOf(context).top + 6,
@@ -369,13 +372,14 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
   }
 }
 
-class _LoadingOverlay extends StatelessWidget {
-  const _LoadingOverlay();
+class _VideoLoadingShimmer extends StatelessWidget {
+  const _VideoLoadingShimmer();
 
   @override
-  Widget build(BuildContext context) => const ColoredBox(
-        color: Colors.black,
-        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+  Widget build(BuildContext context) => Shimmer.fromColors(
+        baseColor: const Color(0xFF101817),
+        highlightColor: const Color(0xFF2B3836),
+        child: const ColoredBox(color: Color(0xFF171F1E)),
       );
 }
 
