@@ -1,4 +1,4 @@
-name: Build TikVply Android
+name: Build Plytired video Android
 
 on:
   push:
@@ -16,11 +16,11 @@ concurrency:
 
 jobs:
   build:
-    name: Build TikVply APKs
+    name: Build Plytired video APKs
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout TikVply
+      - name: Checkout Plytired video
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -92,6 +92,7 @@ jobs:
           application.set(ANDROID + 'hardwareAccelerated', 'true')
           application.set(ANDROID + 'largeHeap', 'true')
           application.set(ANDROID + 'icon', '@drawable/tikvply_launcher')
+          application.set(ANDROID + 'label', 'Plytired video')
 
           service = None
           for item in application.findall('service'):
@@ -413,7 +414,7 @@ jobs:
           test -f android/app/src/main/kotlin/com/tikvply/tikvply/MainActivity.kt
           test -f android/app/src/main/kotlin/com/tikvply/tikvply/MediaPlaybackService.kt
 
-      - name: Install TikVply dependencies
+      - name: Install Plytired video dependencies
         run: flutter pub get
 
       - name: Patch legacy video_thumbnail Android build
