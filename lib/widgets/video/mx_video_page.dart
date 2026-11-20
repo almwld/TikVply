@@ -138,9 +138,32 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       await _player.setRate(settings.playbackSpeed);
       await _player.setVolume(settings.muted ? 0 : 100);
       await _player.setPlaylistMode(settings.loop ? PlaylistMode.single : PlaylistMode.none);
+      await _applyVideoEnhancement();
       if (_player.state.playing) _updateWakeLock(true);
     } catch (error) {
       debugPrint('TikVply media settings update failed: $error');
+    }
+  }
+
+
+  /// Applies optional libmpv filters to decoded frames. Hardware decoding
+  /// remains enabled, but lavfi post-processing may use CPU resources.
+  Future<void> _applyVideoEnhancement() async {
+    if (!mounted || !widget.isActive) return;
+    final filter = switch (settings.videoEnhancement) {
+      VideoEnhancement.off => '',
+      VideoEnhancement.light =>
+        'lavfi=[hqdn3d=1.0:1.0:3.0:3.0,unsharp=5:5:0.35:5:5:0.0]',
+      VideoEnhancement.medium =>
+        'lavfi=[hqdn3d=1.5:1.5:5.0:5.0,unsharp=5:5:0.55:5:5:0.0]',
+      VideoEnhancement.strong =>
+        'lavfi=[hqdn3d=2.0:2.0:7.0:7.0,unsharp=5:5:0.75:5:5:0.0]',
+    };
+    try {
+      await _player.setProperty('vf', filter);
+    } catch (error) {
+      // Optional processing must never interrupt video playback.
+      debugPrint('TikVply video enhancement unavailable: $error');
     }
   }
 
@@ -183,6 +206,7 @@ class _MxVideoPageState extends State<MxVideoPage> with WidgetsBindingObserver {
       await _player.setRate(settings.playbackSpeed);
       await _player.setVolume(settings.muted ? 0 : 100);
       await _player.setPlaylistMode(settings.loop ? PlaylistMode.single : PlaylistMode.none);
+      await _applyVideoEnhancement();
 
       // open() is deliberately bounded: an unreadable file must not keep the
       // UI on a shimmer forever. libmpv performs the actual codec detection.
