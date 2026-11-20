@@ -451,7 +451,7 @@ jobs:
           test -d assets/animations
           test -f assets/icons/svg/tikvply_logo.svg
 
-      - name: Build TikVply release APKs
+      - name: Build Plytired video release APKs
         run: |
           set -euo pipefail
           flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
@@ -498,13 +498,13 @@ jobs:
       - name: 📤 Upload Play Store AAB
         uses: actions/upload-artifact@v4
         with:
-          name: tikvply-playstore-aab
+          name: plytired-video-playstore-aab
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
 
       - name: 📤 Upload Dart obfuscation symbols
         uses: actions/upload-artifact@v4
         with:
-          name: tikvply-symbols
+          name: plytired-video-symbols
           path: build/symbols
           retention-days: 30
