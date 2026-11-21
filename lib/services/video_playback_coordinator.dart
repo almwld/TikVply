@@ -39,10 +39,17 @@ class VideoPlaybackCoordinator {
   }
 
   static Future<void> release(Object owner) {
-    final next = _queue.then((_) {
+    final next = _queue.then((_) async {
       if (!identical(_activeOwner, owner)) return;
-      _activeOwner = null;
-      _stopActive = null;
+      final stop = _stopActive;
+      try {
+        if (stop != null) await stop();
+      } finally {
+        if (identical(_activeOwner, owner)) {
+          _activeOwner = null;
+          _stopActive = null;
+        }
+      }
     });
     _queue = next.catchError((_) {});
     return next;
