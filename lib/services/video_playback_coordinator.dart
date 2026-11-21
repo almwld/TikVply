@@ -1,5 +1,3 @@
-import 'dart:async';
-
 /// Serializes native video-player ownership across every route and entry point.
 ///
 /// A new page cannot initialize its player until the previous owner's stop
