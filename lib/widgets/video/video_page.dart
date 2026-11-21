@@ -91,15 +91,16 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _openGeneration++;
     _saveTimer?.cancel();
     final c = _controller;
-    _controller = null;
     if (c != null) {
       if (c.value.isInitialized) {
         await _savePosition(c.value.position);
         if (c.value.isPlaying) await c.pause();
       }
+      _controller = null;
       c.removeListener(_listener);
       await c.dispose();
     }
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
     await WakelockPlus.disable();
     if (mounted) setState(() => _loading = false);
   }
