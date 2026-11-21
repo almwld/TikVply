@@ -11,6 +11,7 @@ import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_playback_state_service.dart';
+import '../../services/video_playback_coordinator.dart';
 import '../../services/media_playback_service.dart';
 import 'video_actions.dart';
 import 'video_info.dart';
@@ -76,18 +77,32 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       } else {
         _openGeneration++;
         unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
-        if (c != null) {
-          c.pause();
-          if (c.value.isInitialized) _savePosition(c.value.position);
-          c.removeListener(_listener);
-          c.dispose();
-          _controller = null;
-        }
+        unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
+        // release() awaits the coordinator's teardown callback before a
+        // different route is allowed to initialize another native player.
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _stopForHandoff() async {
+    _openGeneration++;
+    _saveTimer?.cancel();
+    final c = _controller;
+    if (c != null) {
+      if (c.value.isInitialized) {
+        await _savePosition(c.value.position);
+        if (c.value.isPlaying) await c.pause();
+      }
+      _controller = null;
+      c.removeListener(_listener);
+      await c.dispose();
+    }
+    await MediaPlaybackService.stopAndClear(_mediaOwner);
+    await WakelockPlus.disable();
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _resumeActiveController(VideoPlayerController c) async {
@@ -140,7 +155,18 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       previous.removeListener(_listener);
       await previous.dispose();
     }
-    if (mounted && generation == _openGeneration) setState(() => _loading = true);
+    // A newer page activation/open may have superseded this asynchronous
+    // disposal. Never create a controller for an obsolete generation.
+    if (!mounted || generation != _openGeneration || !widget.isActive) return;
+    // A global lease serializes controller ownership across feed, search,
+    // profile and library routes. The previous page is stopped and disposed
+    // before this page initializes a new native player.
+    await VideoPlaybackCoordinator.acquire(_mediaOwner, _stopForHandoff);
+    if (!mounted || generation != _openGeneration || !widget.isActive) {
+      await VideoPlaybackCoordinator.release(_mediaOwner);
+      return;
+    }
+    setState(() => _loading = true);
     VideoPlayerController? controller;
     try {
       controller = _network
@@ -527,8 +553,10 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _zoomController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
-    c?.dispose();
     if (widget.isActive) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+    // The lease callback owns native-controller disposal; this avoids racing
+    // route teardown against a newly opened video page.
+    unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

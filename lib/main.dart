@@ -65,7 +65,7 @@ class TikVplyApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => MaterialApp(
-          title: 'TikVply',
+          title: 'Plytired video',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: DarkTheme.darkTheme,

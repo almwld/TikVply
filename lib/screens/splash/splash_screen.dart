@@ -65,7 +65,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               child: ClipRRect(borderRadius: BorderRadius.circular(25), child: SvgPicture.asset('assets/icons/svg/tikvply_logo.svg')),
             ),
             const SizedBox(height: 24),
-            const Text('TikVply', style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: .2, color: Colors.white)),
+            const Text('Plytired video', style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: .2, color: Colors.white)),
             const SizedBox(height: 6),
             Text('مشغل الوسائط الذكي', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: .86))),
             const SizedBox(height: 38),

@@ -1,6 +1,6 @@
 class AppStrings {
   // App Info
-  static const String appName = 'TikVply';
+  static const String appName = 'Plytired video';
   static const String appNameAr = 'تيك فلي';
   static const String appVersion = '1.1.0';
 
