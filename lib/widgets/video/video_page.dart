@@ -11,6 +11,7 @@ import '../../models/video/video_model.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/video_settings_provider.dart';
 import '../../services/video_playback_state_service.dart';
+import '../../services/video_playback_coordinator.dart';
 import '../../services/media_playback_service.dart';
 import 'video_actions.dart';
 import 'video_info.dart';
@@ -76,6 +77,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
       } else {
         _openGeneration++;
         unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+        unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
         if (c != null) {
           c.pause();
           if (c.value.isInitialized) _savePosition(c.value.position);
@@ -88,6 +90,23 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         if (mounted) setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _stopForHandoff() async {
+    _openGeneration++;
+    _saveTimer?.cancel();
+    final c = _controller;
+    _controller = null;
+    if (c != null) {
+      if (c.value.isInitialized) {
+        await _savePosition(c.value.position);
+        if (c.value.isPlaying) await c.pause();
+      }
+      c.removeListener(_listener);
+      await c.dispose();
+    }
+    await WakelockPlus.disable();
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _resumeActiveController(VideoPlayerController c) async {
@@ -143,6 +162,14 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     // A newer page activation/open may have superseded this asynchronous
     // disposal. Never create a controller for an obsolete generation.
     if (!mounted || generation != _openGeneration || !widget.isActive) return;
+    // A global lease serializes controller ownership across feed, search,
+    // profile and library routes. The previous page is stopped and disposed
+    // before this page initializes a new native player.
+    await VideoPlaybackCoordinator.acquire(_mediaOwner, _stopForHandoff);
+    if (!mounted || generation != _openGeneration || !widget.isActive) {
+      await VideoPlaybackCoordinator.release(_mediaOwner);
+      return;
+    }
     setState(() => _loading = true);
     VideoPlayerController? controller;
     try {
@@ -532,6 +559,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     c?.removeListener(_listener);
     c?.dispose();
     if (widget.isActive) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+    unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
     WakelockPlus.disable();
     if (_fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
