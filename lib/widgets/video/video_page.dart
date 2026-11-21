@@ -78,13 +78,8 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
         _openGeneration++;
         unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
         unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
-        if (c != null) {
-          c.pause();
-          if (c.value.isInitialized) _savePosition(c.value.position);
-          c.removeListener(_listener);
-          c.dispose();
-          _controller = null;
-        }
+        // release() awaits the coordinator's teardown callback before a
+        // different route is allowed to initialize another native player.
         _saveTimer?.cancel();
         WakelockPlus.disable();
         if (mounted) setState(() => _loading = false);
@@ -557,8 +552,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _zoomController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     c?.removeListener(_listener);
-    c?.dispose();
     if (widget.isActive) unawaited(MediaPlaybackService.stopAndClear(_mediaOwner));
+    // The lease callback owns native-controller disposal; this avoids racing
+    // route teardown against a newly opened video page.
     unawaited(VideoPlaybackCoordinator.release(_mediaOwner));
     WakelockPlus.disable();
     if (_fullscreen) {
