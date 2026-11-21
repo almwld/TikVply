@@ -18,6 +18,7 @@ void main() {
       expect(firstStopped, isTrue);
       expect(VideoPlaybackCoordinator.owns(first), isFalse);
       expect(VideoPlaybackCoordinator.owns(second), isTrue);
+      await VideoPlaybackCoordinator.release(second);
     });
 
     test('releasing a stale owner cannot clear the current lease', () async {
@@ -28,6 +29,7 @@ void main() {
       await VideoPlaybackCoordinator.release(stale);
 
       expect(VideoPlaybackCoordinator.owns(current), isTrue);
+      await VideoPlaybackCoordinator.release(current);
     });
 
     test('release awaits teardown before clearing ownership', () async {
