@@ -11,11 +11,13 @@ void main() {
       await VideoPlaybackCoordinator.acquire(first, () async {
         firstStopped = true;
       });
+      var secondStopped = false;
       await VideoPlaybackCoordinator.acquire(second, () async {
-        fail('The second owner should not be stopped');
+        secondStopped = true;
       });
 
       expect(firstStopped, isTrue);
+      expect(secondStopped, isFalse);
       expect(VideoPlaybackCoordinator.owns(first), isFalse);
       expect(VideoPlaybackCoordinator.owns(second), isTrue);
       await VideoPlaybackCoordinator.release(second);
